@@ -13,6 +13,8 @@
         content="EventoFácil - Gerenciamento de eventos acadêmicos"
     >
 
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 fill=%27%230878ff%27/%3E%3Ctext x=%2716%27 y=%2721%27 font-family=%27Arial%27 font-size=%2713%27 font-weight=%27900%27 fill=%27white%27 text-anchor=%27middle%27%3EEF%3C/text%3E%3C/svg%3E">
+
     <title>EventoFácil | Eventos Acadêmicos</title>
 
     <!-- FONTES -->
@@ -319,6 +321,28 @@
 
                     <div class="field">
 
+                        <label for="registerRa">
+                            RA (Registro Acadêmico)
+                        </label>
+
+                        <input
+                            type="text"
+                            id="registerRa"
+                            placeholder="Ex.: 565773-3"
+                            autocomplete="off"
+                            maxlength="20"
+                        >
+
+                        <small
+                            id="registerRaError"
+                            class="field-error"
+                        ></small>
+
+                    </div>
+
+
+                    <div class="field">
+
                         <label for="registerPassword">
                             Senha
                         </label>
@@ -378,6 +402,81 @@
                         Criar conta
                         <span>→</span>
                     </button>
+
+                </form>
+
+            </div>
+
+
+
+            <!-- CONFIRMAÇÃO DE E-MAIL (CADASTRO) -->
+
+            <div id="confirmEmailView" class="auth-view">
+
+                <button
+                    class="back-button"
+                    id="backFromConfirm"
+                    type="button"
+                >
+                    ← Voltar
+                </button>
+
+                <div class="auth-heading">
+
+                    <span class="section-label">
+                        CONFIRMAÇÃO
+                    </span>
+
+                    <h2>
+                        Confirme seu
+                        <span>e-mail.</span>
+                    </h2>
+
+                    <p>
+                        Enviamos um código de 6 dígitos para
+                        <strong id="confirmEmailAddress"></strong>.
+                        Digite-o abaixo para ativar sua conta.
+                    </p>
+
+                </div>
+
+                <form id="confirmEmailForm" class="form">
+
+                    <div class="code-inputs" data-code-group="confirm">
+                        <input maxlength="1" inputmode="numeric" aria-label="Dígito 1">
+                        <input maxlength="1" inputmode="numeric" aria-label="Dígito 2">
+                        <input maxlength="1" inputmode="numeric" aria-label="Dígito 3">
+                        <input maxlength="1" inputmode="numeric" aria-label="Dígito 4">
+                        <input maxlength="1" inputmode="numeric" aria-label="Dígito 5">
+                        <input maxlength="1" inputmode="numeric" aria-label="Dígito 6">
+                    </div>
+
+                    <div
+                        id="confirmCodeTimer"
+                        class="code-timer"
+                    ></div>
+
+                    <small
+                        id="confirmCodeError"
+                        class="field-error center"
+                    ></small>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary btn-large"
+                    >
+                        Confirmar e entrar
+                        <span>→</span>
+                    </button>
+
+                    <div class="forgot-password">
+                        <button
+                            type="button"
+                            id="resendConfirmCode"
+                        >
+                            Não recebi o código. Reenviar
+                        </button>
+                    </div>
 
                 </form>
 
@@ -477,7 +576,7 @@
 
                 <form id="forgotCodeForm" class="form">
 
-                    <div class="code-inputs">
+                    <div class="code-inputs" data-code-group="forgot">
 
                         <input maxlength="1" inputmode="numeric">
                         <input maxlength="1" inputmode="numeric">
@@ -765,13 +864,11 @@
                                 PRÓXIMO EVENTO
                             </span>
 
-                            <strong>
-                                IA Generativa
+                            <strong id="heroNextTitle">
+                                Carregando...
                             </strong>
 
-                            <small>
-                                30 SET · 19:00
-                            </small>
+                            <small id="heroNextDate"></small>
 
                         </div>
 
@@ -839,33 +936,8 @@
                         Todos
                     </button>
 
-                    <button
-                        class="category-filter"
-                        data-category="Tecnologia"
-                    >
-                        Tecnologia
-                    </button>
+                    <!-- As demais categorias vêm do banco (GET /api/categorias) -->
 
-                    <button
-                        class="category-filter"
-                        data-category="Carreira"
-                    >
-                        Carreira
-                    </button>
-
-                    <button
-                        class="category-filter"
-                        data-category="Acadêmico"
-                    >
-                        Acadêmico
-                    </button>
-
-                    <button
-                        class="category-filter"
-                        data-category="Criatividade"
-                    >
-                        Criatividade
-                    </button>
 
                 </div>
 
@@ -914,11 +986,6 @@
                             e tire suas dúvidas através do assistente
                             inteligente do EventoFácil.
                         </p>
-
-                        <!--
-                            ESPAÇO RESERVADO PARA A IA.
-                            A implementação será feita posteriormente.
-                        -->
 
                         <button
                             class="btn btn-primary"
@@ -1060,6 +1127,14 @@
                     <span>→</span>
                 </button>
 
+                <button
+                    id="modalCancelButton"
+                    class="btn btn-outline btn-large modal-secondary-button hidden"
+                    type="button"
+                >
+                    Cancelar inscrição
+                </button>
+
             </div>
 
         </div>
@@ -1168,6 +1243,26 @@
                 </div>
 
 
+
+                <!-- RA -->
+
+                <div class="profile-field">
+
+                    <div class="profile-field-info">
+
+                        <span>
+                            RA (Registro Acadêmico)
+                        </span>
+
+                        <strong id="profileRa">
+                            -
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
                 <!-- SENHA -->
 
                 <div class="profile-field">
@@ -1252,7 +1347,7 @@
 
                     <div
                         id="currentPasswordField"
-                        class="field"
+                        class="field hidden"
                     >
 
                         <label for="currentPassword">
@@ -1476,7 +1571,10 @@
 
 
     <!-- =========================================================
-         CHAT / IA PLACEHOLDER
+         ASSISTENTE IA (CHAT)
+         As perguntas vão para o backend (POST /api/assistente/perguntar),
+         que chama o agente do Azure AI Foundry. A chave da API
+         nunca fica no navegador.
     ========================================================== -->
 
     <div
@@ -1484,39 +1582,147 @@
         class="modal-overlay hidden"
     >
 
-        <div class="modal assistant-modal">
+        <div class="modal assistant-modal chat-modal">
 
             <button
                 class="modal-close"
                 data-close-assistant
+                aria-label="Fechar assistente"
             >
                 ×
             </button>
 
-            <div class="assistant-placeholder">
+            <div class="chat-header">
 
-                <div class="assistant-placeholder-icon">
+                <div class="chat-avatar">
                     EF
                 </div>
 
-                <span class="section-label">
-                    ASSISTENTE IA
-                </span>
+                <div class="chat-title">
 
-                <h2>
-                    Espaço reservado
-                    <span>para a IA.</span>
-                </h2>
+                    <span class="section-label">
+                        ASSISTENTE IA
+                    </span>
 
-                <p>
-                    A interface está preparada para receber
-                    o assistente inteligente futuramente.
-                </p>
+                    <h2>
+                        Assistente
+                        <span>EventoFácil.</span>
+                    </h2>
 
-                <div class="ai-status">
-                    <span></span>
-                    Sistema preparado para integração
+                    <div
+                        id="assistantStatus"
+                        class="ai-status"
+                    >
+                        <span></span>
+                        Azure AI Foundry
+                    </div>
+
                 </div>
+
+                <button
+                    id="chatReset"
+                    class="text-button chat-reset"
+                    type="button"
+                    title="Começar uma nova conversa"
+                >
+                    Nova conversa
+                </button>
+
+            </div>
+
+            <div
+                id="chatMessages"
+                class="chat-messages"
+                aria-live="polite"
+            ></div>
+
+            <div
+                id="chatSuggestions"
+                class="chat-suggestions"
+            >
+                <button type="button" data-suggestion="Quais eventos ainda têm vagas?">
+                    Quais eventos têm vagas?
+                </button>
+                <button type="button" data-suggestion="Tenho interesse em Python e Inteligência Artificial. Quais eventos você recomenda?">
+                    Recomende eventos de Python e IA
+                </button>
+                <button type="button" data-suggestion="Em quais eventos eu estou inscrito?">
+                    Minhas inscrições
+                </button>
+            </div>
+
+            <form
+                id="chatForm"
+                class="chat-form"
+                autocomplete="off"
+            >
+
+                <input
+                    id="chatInput"
+                    type="text"
+                    maxlength="1000"
+                    placeholder="Pergunte sobre datas, locais, vagas..."
+                    aria-label="Mensagem para o assistente"
+                >
+
+                <button
+                    id="chatSend"
+                    type="submit"
+                    class="btn btn-primary"
+                >
+                    Enviar
+                    <span>→</span>
+                </button>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         CONFIRMAÇÃO GENÉRICA (ex.: cancelar inscrição)
+    ========================================================== -->
+
+    <div
+        id="confirmModal"
+        class="modal-overlay hidden"
+    >
+
+        <div class="modal confirmation-modal">
+
+            <div class="confirmation-icon">
+                !
+            </div>
+
+            <span class="section-label" id="confirmModalLabel">
+                CONFIRMAÇÃO
+            </span>
+
+            <h2 id="confirmModalTitle">
+                Tem certeza?
+            </h2>
+
+            <p id="confirmModalText"></p>
+
+            <div class="confirmation-actions">
+
+                <button
+                    id="confirmModalNo"
+                    class="btn btn-outline"
+                    type="button"
+                >
+                    Não, voltar
+                </button>
+
+                <button
+                    id="confirmModalYes"
+                    class="btn btn-danger"
+                    type="button"
+                >
+                    Sim, confirmar
+                </button>
 
             </div>
 

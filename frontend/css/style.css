@@ -2729,3 +2729,334 @@ a {
     }
 
 }
+
+
+/* =========================================================
+   INTEGRAÇÃO COM O BACKEND
+   (Etapa 4 - inscrições, confirmação de e-mail e chat da IA)
+========================================================= */
+
+/* Modais abertos a partir do chat ficam por cima dele */
+#eventModal,
+#confirmModal {
+    z-index: 1100;
+}
+
+.btn[disabled],
+.btn.is-loading {
+    opacity: .6;
+    cursor: wait;
+    pointer-events: none;
+}
+
+.modal-secondary-button {
+    margin-top: 12px;
+}
+
+#confirmEmailAddress {
+    color: var(--white);
+}
+
+.registration-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.registration-cancel {
+    padding: 7px 10px;
+    border: 1px solid rgba(255, 77, 95, .28);
+    background: transparent;
+    color: #ff8a96;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    transition: var(--transition);
+}
+
+.registration-cancel:hover {
+    background: rgba(255, 77, 95, .1);
+}
+
+.event-capacity.closed {
+    color: var(--gray);
+}
+
+
+/*
+    Os anéis decorativos do hero passavam da largura da tela no
+    celular e "alargavam" a página (os modais ficavam cortados).
+    overflow-x: clip corta só o excesso sem afetar o header fixo.
+*/
+@media (max-width: 900px) {
+
+    .hero-section {
+        overflow-x: clip;
+    }
+}
+
+
+/* ---------------- Chat do assistente ---------------- */
+
+.chat-modal {
+    display: flex;
+    flex-direction: column;
+    max-width: 720px;
+    height: min(760px, 90vh);
+    overflow: hidden;
+}
+
+.chat-header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 26px 74px 20px 28px;
+    border-bottom: 1px solid var(--border);
+}
+
+.chat-avatar {
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    background:
+        radial-gradient(
+            circle,
+            #168fff,
+            #003a87
+        );
+    box-shadow:
+        0 0 40px rgba(0, 120, 255, .35);
+    font-weight: 900;
+    animation:
+        pulseAI 2.5s ease-in-out infinite;
+}
+
+.chat-title h2 {
+    margin: 4px 0 0;
+    font-family: "Montserrat", sans-serif;
+    font-size: 22px;
+}
+
+.chat-title h2 span {
+    color: var(--blue-light);
+}
+
+.chat-title .ai-status {
+    margin-top: 8px;
+}
+
+.ai-status.offline span {
+    background: var(--danger);
+    box-shadow: 0 0 12px var(--danger);
+}
+
+.chat-reset {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--gray);
+    white-space: nowrap;
+}
+
+.chat-messages {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 24px 28px;
+    overflow-y: auto;
+}
+
+.chat-message {
+    max-width: 85%;
+    padding: 13px 16px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+    animation: authEnter .35s ease;
+}
+
+.chat-message.bot {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, .03);
+}
+
+.chat-message.user {
+    align-self: flex-end;
+    border-color: transparent;
+    background:
+        linear-gradient(
+            110deg,
+            #006eff,
+            #008fff
+        );
+}
+
+.chat-message.error {
+    border-color: rgba(255, 77, 95, .35);
+    color: #ffb3bb;
+}
+
+.chat-meta {
+    display: block;
+    margin-top: 8px;
+    color: var(--gray);
+    font-size: 10px;
+}
+
+.chat-event-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.chat-event-chip {
+    padding: 8px 12px;
+    border: 1px solid rgba(53, 186, 255, .35);
+    background: rgba(8, 120, 255, .08);
+    color: var(--blue-light);
+    font-size: 11px;
+    font-weight: 700;
+    transition: var(--transition);
+}
+
+.chat-event-chip:hover {
+    background: rgba(8, 120, 255, .18);
+}
+
+.chat-typing {
+    display: inline-flex;
+    gap: 5px;
+    padding: 4px 0;
+}
+
+.chat-typing span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--blue-light);
+    animation: chatTyping 1.2s infinite ease-in-out;
+}
+
+.chat-typing span:nth-child(2) {
+    animation-delay: .15s;
+}
+
+.chat-typing span:nth-child(3) {
+    animation-delay: .3s;
+}
+
+@keyframes chatTyping {
+
+    0%, 80%, 100% {
+        opacity: .25;
+        transform: translateY(0);
+    }
+
+    40% {
+        opacity: 1;
+        transform: translateY(-4px);
+    }
+}
+
+.chat-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 28px 14px;
+}
+
+.chat-suggestions button {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--white-soft);
+    font-size: 12px;
+    transition: var(--transition);
+}
+
+.chat-suggestions button:hover {
+    border-color: var(--blue);
+    color: var(--white);
+}
+
+.chat-form {
+    display: flex;
+    gap: 10px;
+    padding: 18px 28px 26px;
+    border-top: 1px solid var(--border);
+}
+
+.chat-form input {
+    flex: 1;
+    min-width: 0;
+    height: 50px;
+    padding: 0 16px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, .03);
+    color: white;
+    outline: none;
+}
+
+.chat-form input:focus {
+    border-color: var(--blue);
+}
+
+@media (max-width: 600px) {
+
+    .chat-modal {
+        height: 92vh;
+    }
+
+    .chat-header {
+        padding: 20px 64px 16px 18px;
+        gap: 12px;
+    }
+
+    .chat-avatar {
+        width: 44px;
+        height: 44px;
+    }
+
+    .chat-title h2 {
+        font-size: 18px;
+    }
+
+    .chat-reset {
+        display: none;
+    }
+
+    .chat-messages {
+        padding: 18px;
+    }
+
+    .chat-message {
+        max-width: 92%;
+    }
+
+    .chat-suggestions {
+        padding: 0 18px 12px;
+    }
+
+    .chat-form {
+        padding: 14px 18px 18px;
+    }
+
+    .chat-form .btn {
+        padding: 0 16px;
+    }
+
+    .chat-form .btn span {
+        display: none;
+    }
+
+    .registration-item {
+        flex-wrap: wrap;
+    }
+}

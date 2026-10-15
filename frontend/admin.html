@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="EventoFácil - Área da coordenação">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 fill=%27%230878ff%27/%3E%3Ctext x=%2716%27 y=%2721%27 font-family=%27Arial%27 font-size=%2713%27 font-weight=%27900%27 fill=%27white%27 text-anchor=%27middle%27%3EEF%3C/text%3E%3C/svg%3E">
+
+    <title>EventoFácil | Coordenação</title>
+
+    <!-- FONTES -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@500;600;700;800&display=swap"
+        rel="stylesheet"
+    >
+
+    <!-- Mesmo visual do site + ajustes da área administrativa -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+
+<body>
+
+    <div class="background-effects">
+        <div class="background-orb orb-1"></div>
+        <div class="background-orb orb-2"></div>
+        <div class="grid-overlay"></div>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+
+    <!-- =========================================================
+         LOGIN DA COORDENAÇÃO (RN04)
+    ========================================================== -->
+
+    <section id="adminLogin" class="admin-login">
+
+        <div class="admin-login-card">
+
+            <div class="brand-small">
+                <div class="brand-mark">EF</div>
+                <span>EVENTO<span>FÁCIL</span></span>
+            </div>
+
+            <div class="auth-heading">
+                <span class="section-label">ÁREA DA COORDENAÇÃO</span>
+                <h2>Gestão de <span>eventos.</span></h2>
+                <p>Acesso restrito à coordenação e aos organizadores.</p>
+            </div>
+
+            <form id="adminLoginForm" class="form">
+
+                <div class="field">
+                    <label for="adminPassword">Senha da coordenação</label>
+                    <input
+                        type="password"
+                        id="adminPassword"
+                        placeholder="Digite a senha"
+                        autocomplete="current-password"
+                    >
+                    <small id="adminPasswordError" class="field-error"></small>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-large">
+                    Entrar <span>→</span>
+                </button>
+
+            </form>
+
+            <a href="/" class="admin-back-link">← Voltar ao site</a>
+
+        </div>
+
+    </section>
+
+
+    <!-- =========================================================
+         PAINEL
+    ========================================================== -->
+
+    <section id="adminPanel" class="admin-panel hidden">
+
+        <header class="main-header admin-header">
+
+            <a href="/" class="brand">
+                <div class="brand-mark">EF</div>
+                <div class="brand-name">EVENTO<span>FÁCIL</span></div>
+            </a>
+
+            <span class="admin-badge">COORDENAÇÃO</span>
+
+            <div class="admin-header-actions">
+                <a href="/" class="text-button">Ver site ↗</a>
+                <button id="adminLogout" class="btn btn-outline" type="button">Sair</button>
+            </div>
+
+        </header>
+
+        <main class="admin-main">
+
+            <div class="section-header admin-title">
+                <div>
+                    <span class="section-label">PAINEL</span>
+                    <h2>Eventos <span>acadêmicos.</span></h2>
+                </div>
+
+                <div class="admin-toolbar">
+                    <button id="newCategoryButton" class="btn btn-outline" type="button">
+                        + Categoria
+                    </button>
+                    <button id="newEventButton" class="btn btn-primary" type="button">
+                        Novo evento <span>+</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="adminStats" class="admin-stats"></div>
+
+            <div class="admin-filters">
+                <label for="statusFilter">Filtrar por status</label>
+                <select id="statusFilter">
+                    <option value="">Todos</option>
+                </select>
+            </div>
+
+            <div id="adminEvents" class="admin-events"></div>
+
+        </main>
+
+    </section>
+
+
+    <!-- =========================================================
+         MODAL: CRIAR / EDITAR EVENTO
+    ========================================================== -->
+
+    <div id="eventFormModal" class="modal-overlay hidden">
+
+        <div class="modal admin-modal">
+
+            <button class="modal-close" type="button" data-close="eventFormModal">×</button>
+
+            <div class="modal-content">
+
+                <span class="section-label">EVENTO</span>
+                <h2 id="eventFormTitle">Novo evento</h2>
+
+                <form id="eventForm" class="form" novalidate>
+
+                    <div class="field">
+                        <label for="fTitulo">Título</label>
+                        <input id="fTitulo" maxlength="150" placeholder="Ex.: Workshop de Python">
+                        <small id="fTituloError" class="field-error"></small>
+                    </div>
+
+                    <div class="field">
+                        <label for="fDescricao">Descrição</label>
+                        <textarea id="fDescricao" rows="3" maxlength="5000" placeholder="Sobre o que é o evento?"></textarea>
+                        <small id="fDescricaoError" class="field-error"></small>
+                    </div>
+
+                    <div class="admin-form-grid">
+
+                        <div class="field">
+                            <label for="fData">Data e horário</label>
+                            <input id="fData" type="datetime-local">
+                            <small id="fDataError" class="field-error"></small>
+                        </div>
+
+                        <div class="field">
+                            <label for="fVagas">Total de vagas</label>
+                            <input id="fVagas" type="number" min="1" step="1" placeholder="Ex.: 50">
+                            <small id="fVagasError" class="field-error"></small>
+                        </div>
+
+                        <div class="field">
+                            <label for="fLocal">Local</label>
+                            <input id="fLocal" maxlength="150" placeholder="Ex.: Auditório 01">
+                            <small id="fLocalError" class="field-error"></small>
+                        </div>
+
+                        <div class="field">
+                            <label for="fCategoria">Categoria</label>
+                            <select id="fCategoria"></select>
+                            <small id="fCategoriaError" class="field-error"></small>
+                        </div>
+
+                    </div>
+
+                    <div class="field">
+                        <label for="fImagem">Link da imagem (opcional)</label>
+                        <input id="fImagem" maxlength="500" placeholder="https://...">
+                        <small id="fImagemError" class="field-error"></small>
+                    </div>
+
+                    <div class="field" id="fStatusField">
+                        <label for="fStatus">Situação inicial</label>
+                        <select id="fStatus">
+                            <option value="Planejado">Planejado (ainda não aparece para os alunos)</option>
+                            <option value="Inscrições Abertas">Inscrições Abertas (publicar agora)</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-large">
+                        Salvar evento <span>✓</span>
+                    </button>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         MODAL: INSCRITOS
+    ========================================================== -->
+
+    <div id="attendeesModal" class="modal-overlay hidden">
+
+        <div class="modal admin-modal">
+
+            <button class="modal-close" type="button" data-close="attendeesModal">×</button>
+
+            <div class="modal-content">
+                <span class="section-label">INSCRITOS</span>
+                <h2 id="attendeesTitle">Evento</h2>
+                <div id="attendeesList" class="admin-attendees"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         MODAL: NOVA CATEGORIA
+    ========================================================== -->
+
+    <div id="categoryModal" class="modal-overlay hidden">
+
+        <div class="modal admin-modal admin-modal-small">
+
+            <button class="modal-close" type="button" data-close="categoryModal">×</button>
+
+            <div class="modal-content">
+
+                <span class="section-label">CATEGORIA</span>
+                <h2>Nova categoria</h2>
+
+                <form id="categoryForm" class="form">
+                    <div class="field">
+                        <label for="categoryName">Nome</label>
+                        <input id="categoryName" maxlength="80" placeholder="Ex.: Esportes">
+                        <small id="categoryNameError" class="field-error"></small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-large">
+                        Criar categoria <span>+</span>
+                    </button>
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         MODAL: CONFIRMAÇÃO
+    ========================================================== -->
+
+    <div id="adminConfirmModal" class="modal-overlay hidden">
+
+        <div class="modal confirmation-modal">
+
+            <div class="confirmation-icon">!</div>
+
+            <span class="section-label">CONFIRMAÇÃO</span>
+
+            <h2 id="adminConfirmTitle">Tem certeza?</h2>
+
+            <p id="adminConfirmText"></p>
+
+            <div class="confirmation-actions">
+                <button id="adminConfirmNo" class="btn btn-outline" type="button">Não, voltar</button>
+                <button id="adminConfirmYes" class="btn btn-danger" type="button">Sim, confirmar</button>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <script src="js/admin.js"></script>
+
+</body>
+</html>

@@ -1,19 +1,15 @@
 /* =========================================================
    EVENTOFÁCIL 2.0
-   Frontend prototype
+   Frontend integrado ao backend
 
-   IMPORTANTE:
-   Este arquivo utiliza localStorage apenas para protótipo.
-
-   Na versão final:
-   Frontend
+   Frontend (HTML / CSS / JavaScript)
+       ↓  fetch + JSON (cookie de sessão)
+   Backend Python / Flask   ->   /api/...
        ↓
-   Flask
-       ↓
-   MySQL
+   MySQL   +   Azure AI Foundry (agente-eventofacil)
 
-   Senhas devem ser armazenadas no backend
-   utilizando hash seguro.
+   O navegador NÃO guarda senhas, inscrições nem a chave
+   da IA. Tudo isso fica no backend (RNF05 / LGPD).
 ========================================================= */
 
 
@@ -21,179 +17,26 @@
    CONFIGURAÇÃO
 ========================================================= */
 
-const STORAGE_USERS = "eventoFacil_users";
-const STORAGE_SESSION = "eventoFacil_session";
-const STORAGE_REGISTRATIONS = "eventoFacil_registrations";
+const API_URL = "/api";
 
+// Atualiza as vagas na tela a cada 30 segundos (RF01 - tempo real)
+const EVENTS_REFRESH_MS = 30000;
 
-/* =========================================================
-   EVENTOS
-========================================================= */
+const DEFAULT_EVENT_IMAGE =
+    "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=85";
 
-const events = [
-
-    {
-        id: 1,
-
-        title: "IA Generativa na Prática",
-
-        category: "Tecnologia",
-
-        date: "30 SET",
-
-        fullDate: "30 de setembro de 2026",
-
-        time: "19:00",
-
-        location: "Auditório 01",
-
-        capacity: 42,
-
-        totalCapacity: 100,
-
-        description:
-            "Uma introdução prática às possibilidades da inteligência artificial generativa no ambiente acadêmico e profissional.",
-
-        image:
-            "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=1200&q=85"
-    },
-
-
-    {
-        id: 2,
-
-        title: "Carreira & Primeiro Emprego",
-
-        category: "Carreira",
-
-        date: "03 OUT",
-
-        fullDate: "03 de outubro de 2026",
-
-        time: "18:30",
-
-        location: "Sala Magna",
-
-        capacity: 17,
-
-        totalCapacity: 80,
-
-        description:
-            "Estratégias para entrar no mercado, construir currículo e desenvolver uma carreira profissional.",
-
-        image:
-            "https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=1200&q=85"
-    },
-
-
-    {
-        id: 3,
-
-        title: "Semana de Desenvolvimento Web",
-
-        category: "Tecnologia",
-
-        date: "07 OUT",
-
-        fullDate: "07 de outubro de 2026",
-
-        time: "19:00",
-
-        location: "Laboratório 04",
-
-        capacity: 0,
-
-        totalCapacity: 60,
-
-        description:
-            "Uma experiência dedicada ao desenvolvimento web moderno, interfaces e novas tecnologias.",
-
-        image:
-            "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=85"
-    },
-
-
-    {
-        id: 4,
-
-        title: "Comunicação e Apresentações",
-
-        category: "Acadêmico",
-
-        date: "10 OUT",
-
-        fullDate: "10 de outubro de 2026",
-
-        time: "20:00",
-
-        location: "Auditório 02",
-
-        capacity: 31,
-
-        totalCapacity: 100,
-
-        description:
-            "Aprenda técnicas para apresentar ideias com clareza, confiança e impacto.",
-
-        image:
-            "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?auto=format&fit=crop&w=1200&q=85"
-    },
-
-
-    {
-        id: 5,
-
-        title: "Design, Criatividade & Tecnologia",
-
-        category: "Criatividade",
-
-        date: "15 OUT",
-
-        fullDate: "15 de outubro de 2026",
-
-        time: "19:00",
-
-        location: "Espaço Inovação",
-
-        capacity: 26,
-
-        totalCapacity: 70,
-
-        description:
-            "Como criatividade, design e tecnologia podem trabalhar juntos para criar experiências melhores.",
-
-        image:
-            "https://images.unsplash.com/photo-1558655146-d09347e92766?auto=format&fit=crop&w=1200&q=85"
-    },
-
-
-    {
-        id: 6,
-
-        title: "Dados e o Futuro das Profissões",
-
-        category: "Acadêmico",
-
-        date: "21 OUT",
-
-        fullDate: "21 de outubro de 2026",
-
-        time: "18:00",
-
-        location: "Auditório 01",
-
-        capacity: 12,
-
-        totalCapacity: 100,
-
-        description:
-            "Uma conversa sobre dados, transformação digital e as novas oportunidades profissionais.",
-
-        image:
-            "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=85"
-    }
-
+const MONTHS_SHORT = [
+    "JAN", "FEV", "MAR", "ABR", "MAI", "JUN",
+    "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"
 ];
+
+const MONTHS_LONG = [
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
+];
+
+const STATUS_OPEN = "Inscrições Abertas";
+const STATUS_RUNNING = "Em Andamento";
 
 
 /* =========================================================
@@ -206,121 +49,203 @@ let currentEvent = null;
 
 let currentCategory = "Todos";
 
+let events = [];
+
 let editingField = null;
 
 let hasUnsavedChanges = false;
 
+let pendingConfirmEmail = null;
+
 let recoveryEmail = null;
 
-let recoveryCode = null;
+let codeTimers = {};
 
-let recoveryCodeExpiration = null;
+let eventsRefreshTimer = null;
 
-let recoveryTimer = null;
+let chatConversationId = null;
+
+let chatBusy = false;
+
+let confirmCallback = null;
 
 
 /* =========================================================
    ELEMENTOS
 ========================================================= */
 
-const authScreen =
-    document.getElementById("authScreen");
+const authScreen = document.getElementById("authScreen");
 
-const mainScreen =
-    document.getElementById("mainScreen");
+const mainScreen = document.getElementById("mainScreen");
 
-const authViews =
-    document.querySelectorAll(".auth-view");
+const authViews = document.querySelectorAll(".auth-view");
 
-const eventsGrid =
-    document.getElementById("eventsGrid");
+const eventsGrid = document.getElementById("eventsGrid");
 
-const registrationsList =
-    document.getElementById("registrationsList");
+const registrationsList = document.getElementById("registrationsList");
 
+const chatMessages = document.getElementById("chatMessages");
 
-/* =========================================================
-   STORAGE
-========================================================= */
+const chatForm = document.getElementById("chatForm");
 
-function getUsers() {
+const chatInput = document.getElementById("chatInput");
 
-    return JSON.parse(
-        localStorage.getItem(STORAGE_USERS) || "[]"
-    );
+const chatSend = document.getElementById("chatSend");
 
-}
-
-
-function saveUsers(users) {
-
-    localStorage.setItem(
-        STORAGE_USERS,
-        JSON.stringify(users)
-    );
-
-}
-
-
-function getRegistrations() {
-
-    return JSON.parse(
-        localStorage.getItem(STORAGE_REGISTRATIONS) || "{}"
-    );
-
-}
-
-
-function saveRegistrations(registrations) {
-
-    localStorage.setItem(
-        STORAGE_REGISTRATIONS,
-        JSON.stringify(registrations)
-    );
-
-}
+const chatSuggestions = document.getElementById("chatSuggestions");
 
 
 /* =========================================================
-   HASH SIMPLES PARA PROTÓTIPO
+   COMUNICAÇÃO COM A API
 ========================================================= */
 
-async function hashPassword(password) {
+class ApiError extends Error {
 
-    const data =
-        new TextEncoder().encode(password);
+    constructor(message, status, data) {
+        super(message);
+        this.status = status;
+        this.data = data || {};
+    }
+}
 
-    const hashBuffer =
-        await crypto.subtle.digest(
-            "SHA-256",
+
+async function api(path, options = {}) {
+
+    const config = {
+        method: options.method || "GET",
+        headers: {},
+        credentials: "same-origin"
+    };
+
+    if (options.body !== undefined) {
+        config.headers["Content-Type"] = "application/json";
+        config.body = JSON.stringify(options.body);
+    }
+
+    let response;
+
+    try {
+        response = await fetch(API_URL + path, config);
+    }
+    catch (error) {
+        throw new ApiError(
+            "Não foi possível conectar ao servidor. Verifique se o backend está rodando.",
+            0
+        );
+    }
+
+    let data = {};
+
+    try {
+        data = await response.json();
+    }
+    catch (error) {
+        data = {};
+    }
+
+    if (!response.ok) {
+        throw new ApiError(
+            data.erro || "Erro inesperado. Tente novamente.",
+            response.status,
             data
         );
+    }
 
-    const hashArray =
-        Array.from(new Uint8Array(hashBuffer));
-
-    return hashArray
-        .map(
-            byte =>
-                byte
-                    .toString(16)
-                    .padStart(2, "0")
-        )
-        .join("");
-
+    return data;
 }
 
 
 /*
-    ATENÇÃO:
-
-    Isso é apenas uma proteção básica
-    para o protótipo.
-
-    Na versão final o hash deve ser feito
-    pelo Flask usando uma biblioteca própria
-    de autenticação.
+    Mostra o erro da API no campo certo do formulário.
+    fieldMap: { campoDaApi: ["idDoInput", "idDoErro"] }
 */
+function showApiError(error, fieldMap = {}) {
+
+    const target = fieldMap[error.data.campo];
+
+    if (target) {
+        setFieldError(target[0], target[1], error.message);
+    }
+    else {
+        showToast(error.message, "error");
+    }
+
+    shakeScreen();
+}
+
+
+function setLoading(button, loading) {
+
+    if (!button) {
+        return;
+    }
+
+    button.disabled = loading;
+
+    button.classList.toggle("is-loading", loading);
+}
+
+
+function submitButton(form) {
+    return form.querySelector("[type='submit']");
+}
+
+
+/* =========================================================
+   UTILITÁRIOS
+========================================================= */
+
+function escapeHtml(text) {
+
+    return String(text ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+
+function pad(number) {
+    return String(number).padStart(2, "0");
+}
+
+
+function firstName(name) {
+    return (name || "").split(" ")[0];
+}
+
+
+/*
+    Converte o evento que vem da API para o formato
+    que as telas do protótipo já usavam.
+*/
+function mapEvent(item) {
+
+    const date = new Date(item.data_evento);
+
+    return {
+        id: item.id_evento,
+        title: item.titulo,
+        category: item.categoria || "Geral",
+        date: `${pad(date.getDate())} ${MONTHS_SHORT[date.getMonth()]}`,
+        fullDate: `${date.getDate()} de ${MONTHS_LONG[date.getMonth()]} de ${date.getFullYear()}`,
+        time: `${pad(date.getHours())}:${pad(date.getMinutes())}`,
+        location: item.local || "A definir",
+        capacity: item.inscritos,
+        totalCapacity: item.vagas_totais,
+        available: item.vagas_disponiveis,
+        status: item.status,
+        description: item.descricao || "",
+        image: item.imagem_url || DEFAULT_EVENT_IMAGE,
+        registered: Boolean(item.inscrito)
+    };
+}
+
+
+function canRegister(event) {
+    return event.status === STATUS_OPEN && event.available > 0;
+}
 
 
 /* =========================================================
@@ -330,29 +255,20 @@ async function hashPassword(password) {
 function showAuthView(viewId) {
 
     authViews.forEach(view => {
-
         view.classList.remove("active");
-
     });
 
-    const target =
-        document.getElementById(viewId);
+    const target = document.getElementById(viewId);
 
     if (target) {
         target.classList.add("active");
     }
-
 }
 
 
-function openMainScreen(user) {
+async function openMainScreen(user) {
 
     currentUser = user;
-
-    localStorage.setItem(
-        STORAGE_SESSION,
-        user.email
-    );
 
     authScreen.classList.add("hidden");
 
@@ -360,15 +276,20 @@ function openMainScreen(user) {
 
     updateProfileUI();
 
-    renderEvents();
-
-    renderRegistrations();
-
     window.scrollTo({
         top: 0,
         behavior: "instant"
     });
 
+    await Promise.all([
+        loadCategories(),
+        loadEvents(),
+        renderRegistrations()
+    ]);
+
+    startEventsRefresh();
+
+    checkAssistantStatus();
 }
 
 
@@ -376,13 +297,20 @@ function openMainScreen(user) {
    LOGOUT
 ========================================================= */
 
-function logout() {
+async function logout() {
 
-    localStorage.removeItem(
-        STORAGE_SESSION
-    );
+    try {
+        await api("/auth/logout", { method: "POST" });
+    }
+    catch (error) {
+        // Mesmo sem resposta do servidor, sai da tela
+    }
 
     currentUser = null;
+
+    stopEventsRefresh();
+
+    resetChat();
 
     mainScreen.classList.add("hidden");
 
@@ -392,11 +320,7 @@ function logout() {
 
     clearForms();
 
-    showToast(
-        "Você saiu da sua conta.",
-        "success"
-    );
-
+    showToast("Você saiu da sua conta.", "success");
 }
 
 
@@ -416,11 +340,9 @@ function clearForms() {
             ) {
                 input.value = "";
             }
-
         });
 
     clearErrors();
-
 }
 
 
@@ -429,19 +351,14 @@ function clearErrors() {
     document
         .querySelectorAll(".field")
         .forEach(field => {
-
             field.classList.remove("error");
-
         });
 
     document
         .querySelectorAll(".field-error")
         .forEach(error => {
-
             error.textContent = "";
-
         });
-
 }
 
 
@@ -449,31 +366,23 @@ function clearErrors() {
    ERRO EM CAMPO
 ========================================================= */
 
-function setFieldError(
-    inputId,
-    errorId,
-    message
-) {
+function setFieldError(inputId, errorId, message) {
 
-    const input =
-        document.getElementById(inputId);
+    const input = document.getElementById(inputId);
 
-    const error =
-        document.getElementById(errorId);
+    const error = document.getElementById(errorId);
 
     if (!input || !error) {
         return;
     }
 
-    const field =
-        input.closest(".field");
+    const field = input.closest(".field");
 
     if (field) {
         field.classList.add("error");
     }
 
     error.textContent = message;
-
 }
 
 
@@ -488,7 +397,6 @@ function shakeScreen() {
     void document.body.offsetWidth;
 
     document.body.classList.add("screen-shake");
-
 }
 
 
@@ -496,24 +404,15 @@ function shakeScreen() {
    TOAST
 ========================================================= */
 
-function showToast(
-    message,
-    type = "success"
-) {
+function showToast(message, type = "success") {
 
-    const container =
-        document.getElementById(
-            "toastContainer"
-        );
+    const container = document.getElementById("toastContainer");
 
-    const toast =
-        document.createElement("div");
+    const toast = document.createElement("div");
 
-    toast.className =
-        `toast ${type}`;
+    toast.className = `toast ${type}`;
 
-    toast.textContent =
-        message;
+    toast.textContent = message;
 
     container.appendChild(toast);
 
@@ -521,44 +420,34 @@ function showToast(
 
         toast.style.opacity = "0";
 
-        toast.style.transform =
-            "translateX(30px)";
+        toast.style.transform = "translateX(30px)";
 
         setTimeout(() => {
-
             toast.remove();
-
         }, 300);
 
     }, 3500);
-
 }
 
 
 /* =========================================================
-   VALIDAR EMAIL
+   VALIDAÇÕES
 ========================================================= */
 
 function isValidEmail(email) {
-
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        .test(email);
-
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 
+function isValidRa(ra) {
+    return /^[A-Za-z0-9-]{4,20}$/.test(ra);
+}
+
 /*
     IMPORTANTE:
-
-    Esta função verifica se o endereço
-    possui formato válido.
-
-    Ela NÃO consegue garantir que o e-mail
-    realmente exista.
-
-    Para isso, o backend deverá enviar
-    um e-mail de confirmação ou utilizar
-    um serviço próprio.
+    A validação no navegador só melhora a experiência.
+    O backend valida tudo de novo e confirma que o e-mail
+    existe enviando um código de 6 dígitos.
 */
 
 
@@ -568,130 +457,79 @@ function isValidEmail(email) {
 
 document
     .getElementById("loginForm")
-    .addEventListener(
-        "submit",
-        async event => {
+    .addEventListener("submit", async event => {
 
-            event.preventDefault();
+        event.preventDefault();
 
-            clearErrors();
+        clearErrors();
 
-            const email =
-                document
-                    .getElementById("loginEmail")
-                    .value
-                    .trim()
-                    .toLowerCase();
+        const email = document
+            .getElementById("loginEmail")
+            .value
+            .trim()
+            .toLowerCase();
 
-            const password =
-                document
-                    .getElementById("loginPassword")
-                    .value;
+        const password = document
+            .getElementById("loginPassword")
+            .value;
 
-            let hasError = false;
+        let hasError = false;
 
-            if (!email) {
-
-                setFieldError(
-                    "loginEmail",
-                    "loginEmailError",
-                    "Digite seu e-mail."
-                );
-
-                hasError = true;
-
-            }
-            else if (!isValidEmail(email)) {
-
-                setFieldError(
-                    "loginEmail",
-                    "loginEmailError",
-                    "Digite um e-mail válido."
-                );
-
-                hasError = true;
-
-            }
-
-
-            if (!password) {
-
-                setFieldError(
-                    "loginPassword",
-                    "loginPasswordError",
-                    "Digite sua senha."
-                );
-
-                hasError = true;
-
-            }
-
-
-            if (hasError) {
-
-                shakeScreen();
-
-                return;
-
-            }
-
-
-            const users =
-                getUsers();
-
-            const user =
-                users.find(
-                    item =>
-                        item.email === email
-                );
-
-
-            if (!user) {
-
-                setFieldError(
-                    "loginEmail",
-                    "loginEmailError",
-                    "E-mail não encontrado."
-                );
-
-                shakeScreen();
-
-                return;
-
-            }
-
-
-            const passwordHash =
-                await hashPassword(password);
-
-
-            if (
-                passwordHash !==
-                user.passwordHash
-            ) {
-
-                setFieldError(
-                    "loginPassword",
-                    "loginPasswordError",
-                    "Senha incorreta."
-                );
-
-                shakeScreen();
-
-                return;
-
-            }
-
-
-            openMainScreen(user);
-
-            showToast(
-                `Bem-vindo, ${user.name.split(" ")[0]}!`,
-                "success"
-            );
-
+        if (!email) {
+            setFieldError("loginEmail", "loginEmailError", "Digite seu e-mail.");
+            hasError = true;
         }
-    );
+        else if (!isValidEmail(email)) {
+            setFieldError("loginEmail", "loginEmailError", "Digite um e-mail válido.");
+            hasError = true;
+        }
+
+        if (!password) {
+            setFieldError("loginPassword", "loginPasswordError", "Digite sua senha.");
+            hasError = true;
+        }
+
+        if (hasError) {
+            shakeScreen();
+            return;
+        }
+
+        const button = submitButton(event.target);
+
+        setLoading(button, true);
+
+        try {
+
+            const data = await api("/auth/login", {
+                method: "POST",
+                body: { email, senha: password }
+            });
+
+            await openMainScreen(data.aluno);
+
+            showToast(`Bem-vindo, ${firstName(data.aluno.nome)}!`, "success");
+        }
+        catch (error) {
+
+            // Conta criada, mas e-mail ainda não confirmado
+            if (
+                error.status === 403 &&
+                error.data.codigo === "EMAIL_NAO_CONFIRMADO"
+            ) {
+                openConfirmEmailView(email, error.data.expira_em_segundos);
+                showToast("Confirme seu e-mail para entrar. Enviamos um novo código.", "error");
+                return;
+            }
+
+            showApiError(error, {
+                email: ["loginEmail", "loginEmailError"],
+                senha: ["loginPassword", "loginPasswordError"]
+            });
+        }
+        finally {
+            setLoading(button, false);
+        }
+    });
 
 
 /* =========================================================
@@ -700,214 +538,333 @@ document
 
 document
     .getElementById("registerForm")
-    .addEventListener(
-        "submit",
-        async event => {
+    .addEventListener("submit", async event => {
 
-            event.preventDefault();
+        event.preventDefault();
 
-            clearErrors();
+        clearErrors();
 
-            const name =
-                document
-                    .getElementById("registerName")
-                    .value
-                    .trim();
+        const name = document.getElementById("registerName").value.trim();
 
-            const email =
-                document
-                    .getElementById("registerEmail")
-                    .value
-                    .trim()
-                    .toLowerCase();
+        const email = document
+            .getElementById("registerEmail")
+            .value
+            .trim()
+            .toLowerCase();
 
-            const password =
-                document
-                    .getElementById("registerPassword")
-                    .value;
+        const ra = document
+            .getElementById("registerRa")
+            .value
+            .trim()
+            .toUpperCase();
 
-            const confirmPassword =
-                document
-                    .getElementById(
-                        "registerPasswordConfirm"
-                    )
-                    .value;
+        const password = document.getElementById("registerPassword").value;
 
+        const confirmPassword = document.getElementById("registerPasswordConfirm").value;
 
-            let hasError = false;
+        let hasError = false;
 
-
-            if (!name) {
-
-                setFieldError(
-                    "registerName",
-                    "registerNameError",
-                    "Digite seu nome completo."
-                );
-
-                hasError = true;
-
-            }
-            else if (
-                name.split(" ").filter(Boolean).length < 2
-            ) {
-
-                setFieldError(
-                    "registerName",
-                    "registerNameError",
-                    "Digite nome e sobrenome."
-                );
-
-                hasError = true;
-
-            }
-
-
-            if (!email) {
-
-                setFieldError(
-                    "registerEmail",
-                    "registerEmailError",
-                    "Digite seu e-mail."
-                );
-
-                hasError = true;
-
-            }
-            else if (!isValidEmail(email)) {
-
-                setFieldError(
-                    "registerEmail",
-                    "registerEmailError",
-                    "E-mail inválido."
-                );
-
-                hasError = true;
-
-            }
-
-
-            if (!password) {
-
-                setFieldError(
-                    "registerPassword",
-                    "registerPasswordError",
-                    "Digite uma senha."
-                );
-
-                hasError = true;
-
-            }
-            else if (password.length < 6) {
-
-                setFieldError(
-                    "registerPassword",
-                    "registerPasswordError",
-                    "A senha deve ter pelo menos 6 caracteres."
-                );
-
-                hasError = true;
-
-            }
-
-
-            if (!confirmPassword) {
-
-                setFieldError(
-                    "registerPasswordConfirm",
-                    "registerPasswordConfirmError",
-                    "Confirme sua senha."
-                );
-
-                hasError = true;
-
-            }
-            else if (
-                password !== confirmPassword
-            ) {
-
-                setFieldError(
-                    "registerPasswordConfirm",
-                    "registerPasswordConfirmError",
-                    "As senhas não são iguais."
-                );
-
-                hasError = true;
-
-            }
-
-
-            if (hasError) {
-
-                shakeScreen();
-
-                return;
-
-            }
-
-
-            const users =
-                getUsers();
-
-
-            const alreadyExists =
-                users.some(
-                    user =>
-                        user.email === email
-                );
-
-
-            if (alreadyExists) {
-
-                setFieldError(
-                    "registerEmail",
-                    "registerEmailError",
-                    "Este e-mail já possui uma conta."
-                );
-
-                shakeScreen();
-
-                return;
-
-            }
-
-
-            const passwordHash =
-                await hashPassword(password);
-
-
-            const newUser = {
-
-                id:
-                    Date.now(),
-
-                name,
-
-                email,
-
-                passwordHash,
-
-                createdAt:
-                    new Date().toISOString()
-
-            };
-
-
-            users.push(newUser);
-
-            saveUsers(users);
-
-
-            openMainScreen(newUser);
-
-
-            showToast(
-                "Conta criada com sucesso!",
-                "success"
-            );
-
+        if (!name) {
+            setFieldError("registerName", "registerNameError", "Digite seu nome completo.");
+            hasError = true;
         }
-    );
+        else if (name.split(" ").filter(Boolean).length < 2) {
+            setFieldError("registerName", "registerNameError", "Digite nome e sobrenome.");
+            hasError = true;
+        }
+
+        if (!email) {
+            setFieldError("registerEmail", "registerEmailError", "Digite seu e-mail.");
+            hasError = true;
+        }
+        else if (!isValidEmail(email)) {
+            setFieldError("registerEmail", "registerEmailError", "E-mail inválido.");
+            hasError = true;
+        }
+
+        if (!ra) {
+            setFieldError("registerRa", "registerRaError", "Digite seu RA.");
+            hasError = true;
+        }
+        else if (!isValidRa(ra)) {
+            setFieldError("registerRa", "registerRaError", "Use de 4 a 20 letras, números ou hífen.");
+            hasError = true;
+        }
+
+        if (!password) {
+            setFieldError("registerPassword", "registerPasswordError", "Digite uma senha.");
+            hasError = true;
+        }
+        else if (password.length < 6) {
+            setFieldError("registerPassword", "registerPasswordError", "A senha deve ter pelo menos 6 caracteres.");
+            hasError = true;
+        }
+
+        if (!confirmPassword) {
+            setFieldError("registerPasswordConfirm", "registerPasswordConfirmError", "Confirme sua senha.");
+            hasError = true;
+        }
+        else if (password !== confirmPassword) {
+            setFieldError("registerPasswordConfirm", "registerPasswordConfirmError", "As senhas não são iguais.");
+            hasError = true;
+        }
+
+        if (hasError) {
+            shakeScreen();
+            return;
+        }
+
+        const button = submitButton(event.target);
+
+        setLoading(button, true);
+
+        try {
+
+            const data = await api("/auth/cadastro", {
+                method: "POST",
+                body: { nome: name, email, ra, senha: password }
+            });
+
+            openConfirmEmailView(data.email, data.expira_em_segundos);
+
+            showToast("Conta criada! Enviamos um código para o seu e-mail.", "success");
+        }
+        catch (error) {
+
+            showApiError(error, {
+                nome: ["registerName", "registerNameError"],
+                email: ["registerEmail", "registerEmailError"],
+                ra: ["registerRa", "registerRaError"],
+                senha: ["registerPassword", "registerPasswordError"]
+            });
+        }
+        finally {
+            setLoading(button, false);
+        }
+    });
+
+
+/* =========================================================
+   CÓDIGO DE 6 DÍGITOS
+   (confirmação de e-mail e recuperação de senha)
+========================================================= */
+
+document
+    .querySelectorAll(".code-inputs")
+    .forEach(group => {
+
+        const inputs = Array.from(group.querySelectorAll("input"));
+
+        inputs.forEach((input, index) => {
+
+            input.addEventListener("input", () => {
+
+                input.value = input.value.replace(/\D/g, "").slice(-1);
+
+                if (input.value && index < inputs.length - 1) {
+                    inputs[index + 1].focus();
+                }
+            });
+
+            input.addEventListener("keydown", event => {
+
+                if (
+                    event.key === "Backspace" &&
+                    !input.value &&
+                    index > 0
+                ) {
+                    inputs[index - 1].focus();
+                }
+            });
+
+            // Permite colar o código inteiro de uma vez
+            input.addEventListener("paste", event => {
+
+                const digits = (event.clipboardData.getData("text") || "")
+                    .replace(/\D/g, "")
+                    .slice(0, inputs.length);
+
+                if (!digits) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                inputs.forEach((box, i) => {
+                    box.value = digits[i] || "";
+                });
+
+                inputs[Math.min(digits.length, inputs.length) - 1].focus();
+            });
+        });
+    });
+
+
+function getCode(group) {
+
+    return Array
+        .from(document.querySelectorAll(`[data-code-group="${group}"] input`))
+        .map(input => input.value)
+        .join("");
+}
+
+
+function clearCode(group) {
+
+    document
+        .querySelectorAll(`[data-code-group="${group}"] input`)
+        .forEach(input => {
+            input.value = "";
+        });
+}
+
+
+function focusCode(group) {
+
+    const first = document.querySelector(`[data-code-group="${group}"] input`);
+
+    if (first) {
+        setTimeout(() => first.focus(), 50);
+    }
+}
+
+
+/* =========================================================
+   TIMER DO CÓDIGO
+========================================================= */
+
+function startCodeTimer(key, elementId, seconds) {
+
+    stopCodeTimer(key);
+
+    const element = document.getElementById(elementId);
+
+    const end = Date.now() + (seconds || 600) * 1000;
+
+    function updateTimer() {
+
+        const remaining = Math.max(0, end - Date.now());
+
+        const total = Math.floor(remaining / 1000);
+
+        if (remaining <= 0) {
+            element.textContent = "Código expirado. Peça um novo código.";
+            stopCodeTimer(key);
+            return;
+        }
+
+        element.textContent =
+            `Código válido por ${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
+    }
+
+    updateTimer();
+
+    codeTimers[key] = setInterval(updateTimer, 1000);
+}
+
+
+function stopCodeTimer(key) {
+
+    clearInterval(codeTimers[key]);
+
+    delete codeTimers[key];
+}
+
+
+/* =========================================================
+   CONFIRMAÇÃO DE E-MAIL (CADASTRO)
+========================================================= */
+
+function openConfirmEmailView(email, seconds) {
+
+    pendingConfirmEmail = email;
+
+    document.getElementById("confirmEmailAddress").textContent = email;
+
+    document.getElementById("confirmCodeError").textContent = "";
+
+    clearCode("confirm");
+
+    showAuthView("confirmEmailView");
+
+    startCodeTimer("confirm", "confirmCodeTimer", seconds);
+
+    focusCode("confirm");
+}
+
+
+document
+    .getElementById("confirmEmailForm")
+    .addEventListener("submit", async event => {
+
+        event.preventDefault();
+
+        const errorElement = document.getElementById("confirmCodeError");
+
+        errorElement.textContent = "";
+
+        const code = getCode("confirm");
+
+        if (code.length !== 6) {
+            errorElement.textContent = "Digite os 6 dígitos do código.";
+            shakeScreen();
+            return;
+        }
+
+        const button = submitButton(event.target);
+
+        setLoading(button, true);
+
+        try {
+
+            const data = await api("/auth/confirmar-email", {
+                method: "POST",
+                body: { email: pendingConfirmEmail, codigo: code }
+            });
+
+            stopCodeTimer("confirm");
+
+            clearForms();
+
+            await openMainScreen(data.aluno);
+
+            showToast(`E-mail confirmado! Bem-vindo, ${firstName(data.aluno.nome)}!`, "success");
+        }
+        catch (error) {
+
+            errorElement.textContent = error.message;
+
+            shakeScreen();
+        }
+        finally {
+            setLoading(button, false);
+        }
+    });
+
+
+document
+    .getElementById("resendConfirmCode")
+    .addEventListener("click", async () => {
+
+        try {
+
+            const data = await api("/auth/reenviar-codigo", {
+                method: "POST",
+                body: { email: pendingConfirmEmail }
+            });
+
+            clearCode("confirm");
+
+            startCodeTimer("confirm", "confirmCodeTimer", data.expira_em_segundos);
+
+            focusCode("confirm");
+
+            showToast("Novo código enviado para o seu e-mail.", "success");
+        }
+        catch (error) {
+            showToast(error.message, "error");
+        }
+    });
 
 
 /* =========================================================
@@ -916,324 +873,114 @@ document
 
 document
     .getElementById("forgotEmailForm")
-    .addEventListener(
-        "submit",
-        event => {
+    .addEventListener("submit", async event => {
 
-            event.preventDefault();
+        event.preventDefault();
 
-            clearErrors();
+        clearErrors();
 
-            const email =
-                document
-                    .getElementById("forgotEmail")
-                    .value
-                    .trim()
-                    .toLowerCase();
+        const email = document
+            .getElementById("forgotEmail")
+            .value
+            .trim()
+            .toLowerCase();
 
+        if (!email) {
+            setFieldError("forgotEmail", "forgotEmailError", "Digite seu e-mail.");
+            shakeScreen();
+            return;
+        }
 
-            if (!email) {
+        if (!isValidEmail(email)) {
+            setFieldError("forgotEmail", "forgotEmailError", "Digite um e-mail válido.");
+            shakeScreen();
+            return;
+        }
 
-                setFieldError(
-                    "forgotEmail",
-                    "forgotEmailError",
-                    "Digite seu e-mail."
-                );
+        const button = submitButton(event.target);
 
-                shakeScreen();
+        setLoading(button, true);
 
-                return;
+        try {
 
-            }
-
-
-            if (!isValidEmail(email)) {
-
-                setFieldError(
-                    "forgotEmail",
-                    "forgotEmailError",
-                    "Digite um e-mail válido."
-                );
-
-                shakeScreen();
-
-                return;
-
-            }
-
-
-            const users =
-                getUsers();
-
-            const user =
-                users.find(
-                    item =>
-                        item.email === email
-                );
-
-
-            if (!user) {
-
-                setFieldError(
-                    "forgotEmail",
-                    "forgotEmailError",
-                    "E-mail não encontrado."
-                );
-
-                shakeScreen();
-
-                return;
-
-            }
-
+            const data = await api("/auth/recuperar-senha", {
+                method: "POST",
+                body: { email }
+            });
 
             recoveryEmail = email;
 
-            recoveryCode =
-                Math.floor(
-                    100000 +
-                    Math.random() * 900000
-                ).toString();
+            clearCode("forgot");
 
-            recoveryCodeExpiration =
-                Date.now() +
-                5 * 60 * 1000;
+            document.getElementById("forgotCodeError").textContent = "";
 
+            startCodeTimer("forgot", "codeTimer", data.expira_em_segundos);
 
-            /*
-                PROTÓTIPO:
+            showAuthView("forgotCodeView");
 
-                Aqui o código apenas é criado
-                localmente.
+            focusCode("forgot");
 
-                VERSÃO REAL:
-
-                enviar:
-
-                POST /auth/forgot-password
-
-                O Flask deverá gerar o código,
-                salvar temporariamente e enviar
-                pelo serviço de e-mail.
-            */
-
-
-            console.log(
-                "Código de recuperação (protótipo):",
-                recoveryCode
-            );
-
-
-            startRecoveryTimer();
-
-            showAuthView(
-                "forgotCodeView"
-            );
-
-
-            showToast(
-                "Código de recuperação enviado.",
-                "success"
-            );
-
+            showToast("Código de recuperação enviado para o seu e-mail.", "success");
         }
-    );
+        catch (error) {
 
-
-/* =========================================================
-   TIMER RECUPERAÇÃO
-========================================================= */
-
-function startRecoveryTimer() {
-
-    clearInterval(recoveryTimer);
-
-    function updateTimer() {
-
-        const remaining =
-            Math.max(
-                0,
-                recoveryCodeExpiration -
-                Date.now()
-            );
-
-        const seconds =
-            Math.floor(
-                remaining / 1000
-            );
-
-        const minutes =
-            Math.floor(
-                seconds / 60
-            );
-
-        const rest =
-            seconds % 60;
-
-        document.getElementById(
-            "codeTimer"
-        ).textContent =
-            `Código válido por ${String(minutes).padStart(2,"0")}:${String(rest).padStart(2,"0")}`;
-
-
-        if (remaining <= 0) {
-
-            clearInterval(
-                recoveryTimer
-            );
-
-            document.getElementById(
-                "codeTimer"
-            ).textContent =
-                "Código expirado.";
-
+            showApiError(error, {
+                email: ["forgotEmail", "forgotEmailError"]
+            });
         }
-
-    }
-
-
-    updateTimer();
-
-    recoveryTimer =
-        setInterval(
-            updateTimer,
-            1000
-        );
-
-}
+        finally {
+            setLoading(button, false);
+        }
+    });
 
 
 /* =========================================================
-   CÓDIGO DE 6 DÍGITOS
-========================================================= */
-
-const codeInputs =
-    document.querySelectorAll(
-        ".code-inputs input"
-    );
-
-
-codeInputs.forEach(
-    (input, index) => {
-
-        input.addEventListener(
-            "input",
-            () => {
-
-                input.value =
-                    input.value.replace(
-                        /\D/g,
-                        ""
-                    );
-
-
-                if (
-                    input.value &&
-                    index <
-                    codeInputs.length - 1
-                ) {
-
-                    codeInputs[
-                        index + 1
-                    ].focus();
-
-                }
-
-            }
-        );
-
-
-        input.addEventListener(
-            "keydown",
-            event => {
-
-                if (
-                    event.key ===
-                    "Backspace" &&
-                    !input.value &&
-                    index > 0
-                ) {
-
-                    codeInputs[
-                        index - 1
-                    ].focus();
-
-                }
-
-            }
-        );
-
-    }
-);
-
-
-/* =========================================================
-   CONFIRMAR CÓDIGO
+   RECUPERAÇÃO - CONFIRMAR CÓDIGO
 ========================================================= */
 
 document
     .getElementById("forgotCodeForm")
-    .addEventListener(
-        "submit",
-        event => {
+    .addEventListener("submit", async event => {
 
-            event.preventDefault();
+        event.preventDefault();
 
-            const enteredCode =
-                Array
-                    .from(codeInputs)
-                    .map(
-                        input =>
-                            input.value
-                    )
-                    .join("");
+        const errorElement = document.getElementById("forgotCodeError");
 
+        errorElement.textContent = "";
 
-            if (
-                Date.now() >
-                recoveryCodeExpiration
-            ) {
+        const code = getCode("forgot");
 
-                document.getElementById(
-                    "forgotCodeError"
-                ).textContent =
-                    "Este código expirou.";
-
-                shakeScreen();
-
-                return;
-
-            }
-
-
-            if (
-                enteredCode !==
-                recoveryCode
-            ) {
-
-                document.getElementById(
-                    "forgotCodeError"
-                ).textContent =
-                    "Código incorreto.";
-
-                shakeScreen();
-
-                return;
-
-            }
-
-
-            clearInterval(
-                recoveryTimer
-            );
-
-
-            showAuthView(
-                "resetPasswordView"
-            );
-
+        if (code.length !== 6) {
+            errorElement.textContent = "Digite os 6 dígitos do código.";
+            shakeScreen();
+            return;
         }
-    );
+
+        const button = submitButton(event.target);
+
+        setLoading(button, true);
+
+        try {
+
+            await api("/auth/recuperar-senha/verificar", {
+                method: "POST",
+                body: { email: recoveryEmail, codigo: code }
+            });
+
+            stopCodeTimer("forgot");
+
+            showAuthView("resetPasswordView");
+        }
+        catch (error) {
+
+            errorElement.textContent = error.message;
+
+            shakeScreen();
+        }
+        finally {
+            setLoading(button, false);
+        }
+    });
 
 
 /* =========================================================
@@ -1242,189 +989,256 @@ document
 
 document
     .getElementById("resetPasswordForm")
-    .addEventListener(
-        "submit",
-        async event => {
+    .addEventListener("submit", async event => {
 
-            event.preventDefault();
+        event.preventDefault();
 
-            clearErrors();
+        clearErrors();
 
-            const password =
-                document
-                    .getElementById("newPassword")
-                    .value;
+        const password = document.getElementById("newPassword").value;
 
-            const confirm =
-                document
-                    .getElementById(
-                        "newPasswordConfirm"
-                    )
-                    .value;
+        const confirm = document.getElementById("newPasswordConfirm").value;
 
+        let hasError = false;
 
-            let hasError = false;
+        if (!password) {
+            setFieldError("newPassword", "newPasswordError", "Digite a nova senha.");
+            hasError = true;
+        }
+        else if (password.length < 6) {
+            setFieldError("newPassword", "newPasswordError", "A senha deve ter pelo menos 6 caracteres.");
+            hasError = true;
+        }
 
+        if (!confirm) {
+            setFieldError("newPasswordConfirm", "newPasswordConfirmError", "Confirme a nova senha.");
+            hasError = true;
+        }
+        else if (password !== confirm) {
+            setFieldError("newPasswordConfirm", "newPasswordConfirmError", "As senhas não são iguais.");
+            hasError = true;
+        }
 
-            if (!password) {
+        if (hasError) {
+            shakeScreen();
+            return;
+        }
 
-                setFieldError(
-                    "newPassword",
-                    "newPasswordError",
-                    "Digite a nova senha."
-                );
+        const button = submitButton(event.target);
 
-                hasError = true;
+        setLoading(button, true);
 
-            }
-            else if (password.length < 6) {
+        try {
 
-                setFieldError(
-                    "newPassword",
-                    "newPasswordError",
-                    "A senha deve ter pelo menos 6 caracteres."
-                );
+            await api("/auth/recuperar-senha/redefinir", {
+                method: "POST",
+                body: { senha: password }
+            });
 
-                hasError = true;
-
-            }
-
-
-            if (!confirm) {
-
-                setFieldError(
-                    "newPasswordConfirm",
-                    "newPasswordConfirmError",
-                    "Confirme a nova senha."
-                );
-
-                hasError = true;
-
-            }
-            else if (
-                password !== confirm
-            ) {
-
-                setFieldError(
-                    "newPasswordConfirm",
-                    "newPasswordConfirmError",
-                    "As senhas não são iguais."
-                );
-
-                hasError = true;
-
-            }
-
-
-            if (hasError) {
-
-                shakeScreen();
-
-                return;
-
-            }
-
-
-            const users =
-                getUsers();
-
-            const userIndex =
-                users.findIndex(
-                    user =>
-                        user.email ===
-                        recoveryEmail
-                );
-
-
-            if (userIndex === -1) {
-
-                showToast(
-                    "Conta não encontrada.",
-                    "error"
-                );
-
-                return;
-
-            }
-
-
-            users[userIndex].passwordHash =
-                await hashPassword(password);
-
-
-            saveUsers(users);
-
-
-            clearInterval(
-                recoveryTimer
-            );
-
+            const email = recoveryEmail;
 
             recoveryEmail = null;
 
-            recoveryCode = null;
-
-
             clearForms();
 
-            showAuthView(
-                "loginView"
-            );
+            document.getElementById("loginEmail").value = email || "";
 
+            showAuthView("loginView");
 
-            showToast(
-                "Senha alterada. Faça login novamente.",
-                "success"
-            );
-
+            showToast("Senha alterada. Faça login novamente.", "success");
         }
-    );
+        catch (error) {
+
+            showApiError(error, {
+                senha: ["newPassword", "newPasswordError"]
+            });
+        }
+        finally {
+            setLoading(button, false);
+        }
+    });
+
+
+/* =========================================================
+   CATEGORIAS (vêm do banco)
+========================================================= */
+
+async function loadCategories() {
+
+    try {
+
+        const categories = await api("/categorias");
+
+        renderCategoryFilters(categories);
+    }
+    catch (error) {
+        showToast(error.message, "error");
+    }
+}
+
+
+function renderCategoryFilters(categories) {
+
+    const container = document.getElementById("categoryFilters");
+
+    container
+        .querySelectorAll(".category-filter:not([data-category='Todos'])")
+        .forEach(button => button.remove());
+
+    categories.forEach(category => {
+
+        const button = document.createElement("button");
+
+        button.className = "category-filter";
+
+        button.dataset.category = category.nome;
+
+        button.textContent = category.nome;
+
+        container.appendChild(button);
+    });
+
+    if (!categories.some(category => category.nome === currentCategory)) {
+        currentCategory = "Todos";
+    }
+
+    container
+        .querySelectorAll(".category-filter")
+        .forEach(button => {
+            button.classList.toggle("active", button.dataset.category === currentCategory);
+        });
+}
+
+
+/* =========================================================
+   FILTRO CATEGORIA
+========================================================= */
+
+document
+    .getElementById("categoryFilters")
+    .addEventListener("click", event => {
+
+        const button = event.target.closest(".category-filter");
+
+        if (!button) {
+            return;
+        }
+
+        document
+            .querySelectorAll(".category-filter")
+            .forEach(item => item.classList.remove("active"));
+
+        button.classList.add("active");
+
+        currentCategory = button.dataset.category;
+
+        renderEvents();
+    });
 
 
 /* =========================================================
    EVENTOS
 ========================================================= */
 
+async function loadEvents(options = {}) {
+
+    try {
+
+        const data = await api("/eventos");
+
+        events = data.map(mapEvent);
+
+        renderEvents();
+
+        updateHeroNextEvent();
+    }
+    catch (error) {
+
+        if (options.silent) {
+            return;
+        }
+
+        eventsGrid.innerHTML = `
+            <div class="empty-state">
+                <strong>Não foi possível carregar os eventos.</strong>
+                ${escapeHtml(error.message)}
+            </div>
+        `;
+    }
+}
+
+
+function startEventsRefresh() {
+
+    stopEventsRefresh();
+
+    eventsRefreshTimer = setInterval(() => {
+
+        if (currentUser && !document.hidden) {
+            loadEvents({ silent: true });
+        }
+
+    }, EVENTS_REFRESH_MS);
+}
+
+
+function stopEventsRefresh() {
+    clearInterval(eventsRefreshTimer);
+}
+
+
+document.addEventListener("visibilitychange", () => {
+
+    if (!document.hidden && currentUser) {
+        loadEvents({ silent: true });
+    }
+});
+
+
+function capacityLabel(event) {
+
+    if (event.registered) {
+        return { text: "Você está inscrito ✓", css: "" };
+    }
+
+    if (event.status === STATUS_RUNNING) {
+        return { text: "Evento em andamento", css: "closed" };
+    }
+
+    if (!canRegister(event)) {
+        return { text: "Evento lotado", css: "full" };
+    }
+
+    return {
+        text: `${event.available} de ${event.totalCapacity} vagas disponíveis`,
+        css: ""
+    };
+}
+
+
 function renderEvents() {
 
-    const search =
-        document
-            .getElementById("eventSearch")
-            .value
-            .trim()
-            .toLowerCase();
+    const search = document
+        .getElementById("eventSearch")
+        .value
+        .trim()
+        .toLowerCase();
 
+    const filtered = events.filter(event => {
 
-    const filtered =
-        events.filter(event => {
+        const matchesCategory =
+            currentCategory === "Todos" ||
+            event.category === currentCategory;
 
-            const matchesCategory =
-                currentCategory === "Todos" ||
-                event.category === currentCategory;
+        const matchesSearch =
+            event.title.toLowerCase().includes(search) ||
+            event.description.toLowerCase().includes(search) ||
+            event.category.toLowerCase().includes(search);
 
-
-            const matchesSearch =
-                event.title
-                    .toLowerCase()
-                    .includes(search) ||
-                event.description
-                    .toLowerCase()
-                    .includes(search) ||
-                event.category
-                    .toLowerCase()
-                    .includes(search);
-
-
-            return (
-                matchesCategory &&
-                matchesSearch
-            );
-
-        });
-
+        return matchesCategory && matchesSearch;
+    });
 
     eventsGrid.innerHTML = "";
-
 
     if (!filtered.length) {
 
@@ -1436,145 +1250,72 @@ function renderEvents() {
         `;
 
         return;
-
     }
 
+    filtered.forEach((event, index) => {
 
-    filtered.forEach(
-        (event, index) => {
+        const capacity = capacityLabel(event);
 
-            const available =
-                event.capacity <
-                event.totalCapacity;
+        const card = document.createElement("article");
 
+        card.className = "event-card";
 
-            const card =
-                document.createElement("article");
+        card.style.animationDelay = `${index * 70}ms`;
 
-            card.className =
-                "event-card";
+        card.innerHTML = `
+            <div class="event-card-image">
+                <img
+                    src="${escapeHtml(event.image)}"
+                    alt="${escapeHtml(event.title)}"
+                    loading="lazy"
+                >
+                <div class="event-card-gradient"></div>
+            </div>
 
-            card.style.animationDelay =
-                `${index * 70}ms`;
+            <div class="event-card-content">
 
+                <span class="event-category">
+                    ${escapeHtml(event.category)}
+                </span>
 
-            card.innerHTML = `
+                <h3>
+                    ${escapeHtml(event.title)}
+                </h3>
 
-                <div class="event-card-image">
+                <p class="event-card-description">
+                    ${escapeHtml(event.description)}
+                </p>
 
-                    <img
-                        src="${event.image}"
-                        alt="${event.title}"
-                    >
-
-                    <div
-                        class="event-card-gradient"
-                    ></div>
-
+                <div class="event-meta">
+                    <span>◷ ${event.date}</span>
+                    <span>◉ ${event.time}</span>
+                    <span>⌖ ${escapeHtml(event.location)}</span>
                 </div>
 
-
-                <div class="event-card-content">
-
-                    <span class="event-category">
-                        ${event.category}
-                    </span>
-
-                    <h3>
-                        ${event.title}
-                    </h3>
-
-                    <p class="event-card-description">
-                        ${event.description}
-                    </p>
-
-                    <div class="event-meta">
-
-                        <span>
-                            ◷ ${event.date}
-                        </span>
-
-                        <span>
-                            ◉ ${event.time}
-                        </span>
-
-                        <span>
-                            ⌖ ${event.location}
-                        </span>
-
-                    </div>
-
-                    <div
-                        class="
-                            event-capacity
-                            ${!available ? "full" : ""}
-                        "
-                    >
-                        ${
-                            available
-                            ? `${event.capacity} vagas ocupadas`
-                            : "Evento lotado"
-                        }
-                    </div>
-
+                <div class="event-capacity ${capacity.css}">
+                    ${capacity.text}
                 </div>
 
-            `;
+            </div>
+        `;
 
+        card.addEventListener("click", () => openEventModal(event));
 
-            card.addEventListener(
-                "click",
-                () => openEventModal(event)
-            );
-
-
-            eventsGrid.appendChild(card);
-
-        }
-    );
-
+        eventsGrid.appendChild(card);
+    });
 }
 
 
-/* =========================================================
-   FILTRO CATEGORIA
-========================================================= */
+function updateHeroNextEvent() {
 
-document
-    .querySelectorAll(".category-filter")
-    .forEach(button => {
+    const next = events.find(event => event.status === STATUS_OPEN);
 
-        button.addEventListener(
-            "click",
-            () => {
+    document.getElementById("heroNextTitle").textContent =
+        next ? next.title : "Novos eventos em breve";
 
-                document
-                    .querySelectorAll(
-                        ".category-filter"
-                    )
-                    .forEach(
-                        item =>
-                            item.classList.remove(
-                                "active"
-                            )
-                    );
-
-
-                button.classList.add(
-                    "active"
-                );
-
-
-                currentCategory =
-                    button.dataset.category;
-
-
-                renderEvents();
-
-            }
-        );
-
-    });
+    document.getElementById("heroNextDate").textContent =
+        next ? `${next.date} · ${next.time}` : "";
+}
 
 
 /* =========================================================
@@ -1583,10 +1324,7 @@ document
 
 document
     .getElementById("eventSearch")
-    .addEventListener(
-        "input",
-        renderEvents
-    );
+    .addEventListener("input", renderEvents);
 
 
 /* =========================================================
@@ -1595,332 +1333,309 @@ document
 
 function openEventModal(event) {
 
+    // Sempre usa a versão mais recente do evento (vagas atualizadas)
+    event = events.find(item => item.id === event.id) || event;
+
     currentEvent = event;
 
+    document.getElementById("modalEventTitle").textContent = event.title;
 
-    document.getElementById(
-        "modalEventTitle"
-    ).textContent =
-        event.title;
+    document.getElementById("modalEventCategory").textContent = event.category;
 
+    document.getElementById("modalEventDescription").textContent = event.description;
 
-    document.getElementById(
-        "modalEventCategory"
-    ).textContent =
-        event.category;
+    document.getElementById("modalEventImage").style.backgroundImage =
+        `url("${event.image.replace(/"/g, "%22")}")`;
 
+    const vacancies = canRegister(event)
+        ? `${event.available} de ${event.totalCapacity} disponíveis`
+        : "Esgotadas";
 
-    document.getElementById(
-        "modalEventDescription"
-    ).textContent =
-        event.description;
-
-
-    document.getElementById(
-        "modalEventImage"
-    ).style.backgroundImage =
-        `url("${event.image}")`;
-
-
-    document.getElementById(
-        "modalEventInfo"
-    ).innerHTML = `
-
+    document.getElementById("modalEventInfo").innerHTML = `
         <div class="modal-info-item">
-
             <span>Data</span>
-
-            <strong>
-                ${event.fullDate}
-            </strong>
-
+            <strong>${event.fullDate}</strong>
         </div>
 
-
         <div class="modal-info-item">
-
             <span>Horário</span>
-
-            <strong>
-                ${event.time}
-            </strong>
-
+            <strong>${event.time}</strong>
         </div>
 
-
         <div class="modal-info-item">
-
             <span>Local</span>
-
-            <strong>
-                ${event.location}
-            </strong>
-
+            <strong>${escapeHtml(event.location)}</strong>
         </div>
-
 
         <div class="modal-info-item">
-
             <span>Vagas</span>
-
-            <strong>
-                ${event.totalCapacity - event.capacity}
-                disponíveis
-            </strong>
-
+            <strong>${vacancies}</strong>
         </div>
-
     `;
 
+    const button = document.getElementById("modalRegisterButton");
 
-    const registrations =
-        getRegistrations();
+    const cancelButton = document.getElementById("modalCancelButton");
 
-    const userRegistrations =
-        registrations[
-            currentUser.email
-        ] || [];
+    let label = "Inscrever-se <span>→</span>";
 
+    let enabled = true;
 
-    const alreadyRegistered =
-        userRegistrations.includes(
-            event.id
-        );
-
-
-    const button =
-        document.getElementById(
-            "modalRegisterButton"
-        );
-
-
-    if (alreadyRegistered) {
-
-        button.innerHTML =
-            "Você já está inscrito ✓";
-
-        button.disabled = true;
-
-        button.style.opacity = ".6";
-
+    if (event.registered) {
+        label = "Você já está inscrito ✓";
+        enabled = false;
     }
-    else if (
-        event.capacity >=
-        event.totalCapacity
-    ) {
-
-        button.innerHTML =
-            "Evento lotado";
-
-        button.disabled = true;
-
-        button.style.opacity = ".6";
-
+    else if (event.status === STATUS_RUNNING) {
+        label = "Evento em andamento";
+        enabled = false;
     }
-    else {
-
-        button.innerHTML =
-            "Inscrever-se <span>→</span>";
-
-        button.disabled = false;
-
-        button.style.opacity = "1";
-
+    else if (!canRegister(event)) {
+        label = "Evento lotado";
+        enabled = false;
     }
 
+    button.innerHTML = label;
 
-    document
-        .getElementById("eventModal")
-        .classList.remove("hidden");
+    button.disabled = !enabled;
 
+    button.classList.remove("is-loading");
+
+    button.style.opacity = enabled ? "1" : ".6";
+
+    cancelButton.classList.toggle(
+        "hidden",
+        !(event.registered && event.status !== STATUS_RUNNING)
+    );
+
+    document.getElementById("eventModal").classList.remove("hidden");
 }
 
 
 /* =========================================================
-   INSCRIÇÃO
+   INSCRIÇÃO (RN01, RN02 e RN03 validadas no backend)
 ========================================================= */
 
 document
     .getElementById("modalRegisterButton")
-    .addEventListener(
-        "click",
-        () => {
+    .addEventListener("click", async () => {
 
-            if (
-                !currentUser ||
-                !currentEvent
-            ) {
-                return;
-            }
-
-
-            const registrations =
-                getRegistrations();
-
-
-            if (
-                !registrations[
-                    currentUser.email
-                ]
-            ) {
-
-                registrations[
-                    currentUser.email
-                ] = [];
-
-            }
-
-
-            if (
-                registrations[
-                    currentUser.email
-                ].includes(
-                    currentEvent.id
-                )
-            ) {
-
-                return;
-
-            }
-
-
-            registrations[
-                currentUser.email
-            ].push(
-                currentEvent.id
-            );
-
-
-            saveRegistrations(
-                registrations
-            );
-
-
-            currentEvent.capacity++;
-
-
-            closeModal(
-                "eventModal"
-            );
-
-
-            renderRegistrations();
-
-            renderEvents();
-
-
-            showToast(
-                "Inscrição realizada com sucesso!",
-                "success"
-            );
-
+        if (!currentUser || !currentEvent) {
+            return;
         }
+
+        const button = document.getElementById("modalRegisterButton");
+
+        setLoading(button, true);
+
+        try {
+
+            const data = await api("/inscricoes", {
+                method: "POST",
+                body: { id_evento: currentEvent.id }
+            });
+
+            closeModal("eventModal");
+
+            showToast(data.mensagem, "success");
+        }
+        catch (error) {
+
+            showToast(error.message, "error");
+        }
+        finally {
+
+            setLoading(button, false);
+
+            await Promise.all([
+                loadEvents(),
+                renderRegistrations()
+            ]);
+
+            // Se o modal continua aberto (erro), mostra a situação atualizada
+            if (!document.getElementById("eventModal").classList.contains("hidden")) {
+                openEventModal(currentEvent);
+            }
+        }
+    });
+
+
+document
+    .getElementById("modalCancelButton")
+    .addEventListener("click", () => {
+
+        if (currentEvent) {
+            askCancelRegistration(currentEvent.id, currentEvent.title);
+        }
+    });
+
+
+function askCancelRegistration(eventId, title) {
+
+    askConfirmation(
+        {
+            label: "INSCRIÇÃO",
+            title: "Cancelar inscrição?",
+            text: `Você vai liberar sua vaga em "${title}".`,
+            confirmText: "Sim, cancelar"
+        },
+        () => cancelRegistration(eventId)
     );
+}
+
+
+async function cancelRegistration(eventId) {
+
+    try {
+
+        const data = await api(`/inscricoes/${eventId}`, { method: "DELETE" });
+
+        closeModal("eventModal");
+
+        showToast(
+            data.evento_reaberto
+                ? "Inscrição cancelada. A vaga foi liberada para outros alunos."
+                : "Inscrição cancelada.",
+            "success"
+        );
+    }
+    catch (error) {
+        showToast(error.message, "error");
+    }
+
+    await Promise.all([
+        loadEvents(),
+        renderRegistrations()
+    ]);
+}
 
 
 /* =========================================================
-   MINHAS INSCRIÇÕES
+   MINHAS INSCRIÇÕES (RF07)
 ========================================================= */
 
-function renderRegistrations() {
+async function renderRegistrations() {
 
     if (!currentUser) {
         return;
     }
 
+    let registrations = [];
 
-    const registrations =
-        getRegistrations();
-
-
-    const userRegistrations =
-        registrations[
-            currentUser.email
-        ] || [];
-
-
-    registrationsList.innerHTML = "";
-
-
-    if (!userRegistrations.length) {
+    try {
+        registrations = await api("/inscricoes/minhas");
+    }
+    catch (error) {
 
         registrationsList.innerHTML = `
-
             <div class="empty-state">
-
-                <strong>
-                    Você ainda não possui inscrições.
-                </strong>
-
-                Explore os próximos eventos
-                e escolha sua próxima experiência.
-
+                <strong>Não foi possível carregar suas inscrições.</strong>
+                ${escapeHtml(error.message)}
             </div>
-
         `;
 
         return;
-
     }
 
+    registrationsList.innerHTML = "";
 
-    userRegistrations.forEach(
-        eventId => {
+    if (!registrations.length) {
 
-            const event =
-                events.find(
-                    item =>
-                        item.id === eventId
-                );
+        registrationsList.innerHTML = `
+            <div class="empty-state">
+                <strong>Você ainda não possui inscrições.</strong>
+                Explore os próximos eventos
+                e escolha sua próxima experiência.
+            </div>
+        `;
 
+        return;
+    }
 
-            if (!event) {
-                return;
-            }
+    registrations.forEach(registration => {
 
+        const date = new Date(registration.data_evento);
 
-            const item =
-                document.createElement("div");
+        const canCancel = ![STATUS_RUNNING, "Concluído"].includes(registration.status_evento);
 
-            item.className =
-                "registration-item";
+        const item = document.createElement("div");
 
+        item.className = "registration-item";
 
-            item.innerHTML = `
+        item.innerHTML = `
+            <div class="registration-info">
+                <h3>${escapeHtml(registration.titulo)}</h3>
+                <p>
+                    ${pad(date.getDate())} ${MONTHS_SHORT[date.getMonth()]}
+                    ·
+                    ${pad(date.getHours())}:${pad(date.getMinutes())}
+                    ·
+                    ${escapeHtml(registration.local || "")}
+                </p>
+            </div>
 
-                <div class="registration-info">
+            <div class="registration-actions">
+                <span class="registration-status">INSCRITO</span>
+                ${canCancel ? '<button class="registration-cancel" type="button">CANCELAR</button>' : ""}
+            </div>
+        `;
 
-                    <h3>
-                        ${event.title}
-                    </h3>
+        const cancel = item.querySelector(".registration-cancel");
 
-                    <p>
-                        ${event.date}
-                        ·
-                        ${event.time}
-                        ·
-                        ${event.location}
-                    </p>
-
-                </div>
-
-                <span
-                    class="registration-status"
-                >
-                    INSCRITO
-                </span>
-
-            `;
-
-
-            registrationsList.appendChild(
-                item
-            );
-
+        if (cancel) {
+            cancel.addEventListener("click", () => {
+                askCancelRegistration(registration.id_evento, registration.titulo);
+            });
         }
-    );
 
+        registrationsList.appendChild(item);
+    });
 }
+
+
+/* =========================================================
+   CONFIRMAÇÃO GENÉRICA
+========================================================= */
+
+function askConfirmation(options, onConfirm) {
+
+    document.getElementById("confirmModalLabel").textContent = options.label || "CONFIRMAÇÃO";
+
+    document.getElementById("confirmModalTitle").textContent = options.title || "Tem certeza?";
+
+    document.getElementById("confirmModalText").textContent = options.text || "";
+
+    document.getElementById("confirmModalYes").textContent = options.confirmText || "Sim, confirmar";
+
+    confirmCallback = onConfirm;
+
+    document.getElementById("confirmModal").classList.remove("hidden");
+}
+
+
+document
+    .getElementById("confirmModalYes")
+    .addEventListener("click", async () => {
+
+        const callback = confirmCallback;
+
+        confirmCallback = null;
+
+        closeModal("confirmModal");
+
+        if (callback) {
+            await callback();
+        }
+    });
+
+
+document
+    .getElementById("confirmModalNo")
+    .addEventListener("click", () => {
+
+        confirmCallback = null;
+
+        closeModal("confirmModal");
+    });
 
 
 /* =========================================================
@@ -1929,16 +1644,12 @@ function renderRegistrations() {
 
 function getInitials(name) {
 
-    return name
+    return (name || "")
         .split(" ")
         .filter(Boolean)
         .slice(0, 2)
-        .map(
-            word =>
-                word[0].toUpperCase()
-        )
+        .map(word => word[0].toUpperCase())
         .join("");
-
 }
 
 
@@ -1948,36 +1659,17 @@ function updateProfileUI() {
         return;
     }
 
+    const initials = getInitials(currentUser.nome);
 
-    const initials =
-        getInitials(
-            currentUser.name
-        );
+    document.getElementById("profileInitials").textContent = initials;
 
+    document.getElementById("profileLargeInitials").textContent = initials;
 
-    document.getElementById(
-        "profileInitials"
-    ).textContent =
-        initials;
+    document.getElementById("profileName").textContent = currentUser.nome;
 
+    document.getElementById("profileEmail").textContent = currentUser.email;
 
-    document.getElementById(
-        "profileLargeInitials"
-    ).textContent =
-        initials;
-
-
-    document.getElementById(
-        "profileName"
-    ).textContent =
-        currentUser.name;
-
-
-    document.getElementById(
-        "profileEmail"
-    ).textContent =
-        currentUser.email;
-
+    document.getElementById("profileRa").textContent = currentUser.ra;
 }
 
 
@@ -1987,22 +1679,12 @@ function updateProfileUI() {
 
 document
     .getElementById("profileButton")
-    .addEventListener(
-        "click",
-        () => {
+    .addEventListener("click", () => {
 
-            updateProfileUI();
+        updateProfileUI();
 
-            document
-                .getElementById(
-                    "profileModal"
-                )
-                .classList.remove(
-                    "hidden"
-                );
-
-        }
-    );
+        document.getElementById("profileModal").classList.remove("hidden");
+    });
 
 
 /* =========================================================
@@ -2010,37 +1692,21 @@ document
 ========================================================= */
 
 document
-    .querySelectorAll(
-        "[data-edit-profile]"
-    )
+    .querySelectorAll("[data-edit-profile]")
     .forEach(button => {
 
-        button.addEventListener(
-            "click",
-            () => {
+        button.addEventListener("click", () => {
 
-                editingField =
-                    button.dataset.editProfile;
+            editingField = button.dataset.editProfile;
 
-                document
-                    .getElementById(
-                        "reauthEmail"
-                    )
-                    .value =
-                    currentUser.email;
+            document.getElementById("reauthEmail").value = currentUser.email;
 
+            document.getElementById("reauthPassword").value = "";
 
-                document
-                    .getElementById(
-                        "reauthModal"
-                    )
-                    .classList.remove(
-                        "hidden"
-                    );
+            document.getElementById("reauthError").textContent = "";
 
-            }
-        );
-
+            document.getElementById("reauthModal").classList.remove("hidden");
+        });
     });
 
 
@@ -2050,52 +1716,47 @@ document
 
 document
     .getElementById("reauthForm")
-    .addEventListener(
-        "submit",
-        async event => {
+    .addEventListener("submit", async event => {
 
-            event.preventDefault();
+        event.preventDefault();
 
-            const password =
-                document
-                    .getElementById(
-                        "reauthPassword"
-                    )
-                    .value;
+        const password = document.getElementById("reauthPassword").value;
 
+        const errorElement = document.getElementById("reauthError");
 
-            const hash =
-                await hashPassword(
-                    password
-                );
+        errorElement.textContent = "";
 
+        if (!password) {
+            errorElement.textContent = "Digite sua senha.";
+            shakeScreen();
+            return;
+        }
 
-            if (
-                hash !==
-                currentUser.passwordHash
-            ) {
+        const button = submitButton(event.target);
 
-                document.getElementById(
-                    "reauthError"
-                ).textContent =
-                    "Senha incorreta.";
+        setLoading(button, true);
 
-                shakeScreen();
+        try {
 
-                return;
+            await api("/perfil/reautenticar", {
+                method: "POST",
+                body: { senha: password }
+            });
 
-            }
-
-
-            closeModal(
-                "reauthModal"
-            );
-
+            closeModal("reauthModal");
 
             openEditProfile();
-
         }
-    );
+        catch (error) {
+
+            errorElement.textContent = error.message;
+
+            shakeScreen();
+        }
+        finally {
+            setLoading(button, false);
+        }
+    });
 
 
 /* =========================================================
@@ -2104,108 +1765,49 @@ document
 
 function openEditProfile() {
 
-    const modal =
-        document.getElementById(
-            "editProfileModal"
-        );
+    const modal = document.getElementById("editProfileModal");
 
+    const title = document.getElementById("editProfileTitle");
 
-    const title =
-        document.getElementById(
-            "editProfileTitle"
-        );
+    const label = document.getElementById("newProfileValueLabel");
 
+    const input = document.getElementById("newProfileValue");
 
-    const label =
-        document.getElementById(
-            "newProfileValueLabel"
-        );
-
-
-    const input =
-        document.getElementById(
-            "newProfileValue"
-        );
-
-
-    const passwordConfirm =
-        document.getElementById(
-            "confirmNewPasswordField"
-        );
-
+    const passwordConfirm = document.getElementById("confirmNewPasswordField");
 
     input.value = "";
 
-    passwordConfirm.classList.add(
-        "hidden"
-    );
+    document.getElementById("confirmNewPassword").value = "";
 
+    passwordConfirm.classList.add("hidden");
 
     if (editingField === "name") {
-
-        title.textContent =
-            "Alterar nome";
-
-        label.textContent =
-            "Novo nome completo";
-
-        input.type =
-            "text";
-
-        input.placeholder =
-            "Digite seu novo nome";
-
+        title.textContent = "Alterar nome";
+        label.textContent = "Novo nome completo";
+        input.type = "text";
+        input.placeholder = "Digite seu novo nome";
     }
-
 
     if (editingField === "email") {
-
-        title.textContent =
-            "Alterar e-mail";
-
-        label.textContent =
-            "Novo e-mail";
-
-        input.type =
-            "email";
-
-        input.placeholder =
-            "Digite seu novo e-mail";
-
+        title.textContent = "Alterar e-mail";
+        label.textContent = "Novo e-mail";
+        input.type = "email";
+        input.placeholder = "Digite seu novo e-mail";
     }
-
 
     if (editingField === "password") {
-
-        title.textContent =
-            "Alterar senha";
-
-        label.textContent =
-            "Nova senha";
-
-        input.type =
-            "password";
-
-        input.placeholder =
-            "Digite sua nova senha";
-
-        passwordConfirm.classList.remove(
-            "hidden"
-        );
-
+        title.textContent = "Alterar senha";
+        label.textContent = "Nova senha";
+        input.type = "password";
+        input.placeholder = "Digite sua nova senha";
+        passwordConfirm.classList.remove("hidden");
     }
-
 
     clearErrors();
 
-
-    modal.classList.remove(
-        "hidden"
-    );
-
+    modal.classList.remove("hidden");
 
     hasUnsavedChanges = true;
-
 }
 
 
@@ -2215,234 +1817,103 @@ function openEditProfile() {
 
 document
     .getElementById("editProfileForm")
-    .addEventListener(
-        "submit",
-        async event => {
+    .addEventListener("submit", async event => {
 
-            event.preventDefault();
+        event.preventDefault();
 
-            clearErrors();
+        clearErrors();
 
+        const value = document.getElementById("newProfileValue").value.trim();
 
-            const value =
-                document
-                    .getElementById(
-                        "newProfileValue"
-                    )
-                    .value
-                    .trim();
+        if (!value) {
+            setFieldError("newProfileValue", "newProfileValueError", "Preencha este campo.");
+            shakeScreen();
+            return;
+        }
 
+        if (editingField === "email" && !isValidEmail(value)) {
+            setFieldError("newProfileValue", "newProfileValueError", "Digite um e-mail válido.");
+            shakeScreen();
+            return;
+        }
 
-            if (!value) {
+        if (
+            editingField === "name" &&
+            value.split(" ").filter(Boolean).length < 2
+        ) {
+            setFieldError("newProfileValue", "newProfileValueError", "Digite nome e sobrenome.");
+            shakeScreen();
+            return;
+        }
 
-                setFieldError(
-                    "newProfileValue",
-                    "newProfileValueError",
-                    "Preencha este campo."
-                );
+        if (editingField === "password") {
 
+            if (value.length < 6) {
+                setFieldError("newProfileValue", "newProfileValueError", "A senha deve ter pelo menos 6 caracteres.");
                 shakeScreen();
-
                 return;
-
             }
 
+            const confirm = document.getElementById("confirmNewPassword").value;
 
-            if (
-                editingField === "email" &&
-                !isValidEmail(value)
-            ) {
-
-                setFieldError(
-                    "newProfileValue",
-                    "newProfileValueError",
-                    "Digite um e-mail válido."
-                );
-
+            if (value !== confirm) {
+                setFieldError("confirmNewPassword", "confirmNewPasswordError", "As senhas não são iguais.");
                 shakeScreen();
-
                 return;
-
             }
+        }
 
+        const apiField = {
+            name: "nome",
+            email: "email",
+            password: "senha"
+        }[editingField];
 
-            if (
-                editingField === "name" &&
-                value
-                    .split(" ")
-                    .filter(Boolean)
-                    .length < 2
-            ) {
+        const button = submitButton(event.target);
 
-                setFieldError(
-                    "newProfileValue",
-                    "newProfileValueError",
-                    "Digite nome e sobrenome."
-                );
+        setLoading(button, true);
 
-                shakeScreen();
+        try {
 
-                return;
+            const data = await api("/perfil", {
+                method: "PATCH",
+                body: { campo: apiField, valor: value }
+            });
 
-            }
+            currentUser = data.aluno;
 
-
-            if (
-                editingField === "password"
-            ) {
-
-                if (
-                    value.length < 6
-                ) {
-
-                    setFieldError(
-                        "newProfileValue",
-                        "newProfileValueError",
-                        "A senha deve ter pelo menos 6 caracteres."
-                    );
-
-                    shakeScreen();
-
-                    return;
-
-                }
-
-
-                const confirm =
-                    document
-                        .getElementById(
-                            "confirmNewPassword"
-                        )
-                        .value;
-
-
-                if (
-                    value !== confirm
-                ) {
-
-                    setFieldError(
-                        "confirmNewPassword",
-                        "confirmNewPasswordError",
-                        "As senhas não são iguais."
-                    );
-
-                    shakeScreen();
-
-                    return;
-
-                }
-
-            }
-
-
-            const users =
-                getUsers();
-
-
-            const index =
-                users.findIndex(
-                    user =>
-                        user.email ===
-                        currentUser.email
-                );
-
-
-            if (index === -1) {
-
-                return;
-
-            }
-
-
-            if (
-                editingField === "name"
-            ) {
-
-                users[index].name =
-                    value;
-
-            }
-
-
-            if (
-                editingField === "email"
-            ) {
-
-                const duplicate =
-                    users.some(
-                        (user, i) =>
-                            i !== index &&
-                            user.email === value
-                    );
-
-
-                if (duplicate) {
-
-                    setFieldError(
-                        "newProfileValue",
-                        "newProfileValueError",
-                        "Este e-mail já está cadastrado."
-                    );
-
-                    shakeScreen();
-
-                    return;
-
-                }
-
-
-                users[index].email =
-                    value;
-
-                currentUser.email =
-                    value;
-
-            }
-
-
-            if (
-                editingField === "password"
-            ) {
-
-                users[index].passwordHash =
-                    await hashPassword(
-                        value
-                    );
-
-            }
-
-
-            currentUser =
-                users[index];
-
-
-            saveUsers(users);
-
-
-            localStorage.setItem(
-                STORAGE_SESSION,
-                currentUser.email
-            );
-
-
-            closeModal(
-                "editProfileModal"
-            );
-
+            closeModal("editProfileModal");
 
             updateProfileUI();
 
-
             hasUnsavedChanges = false;
 
-
-            showToast(
-                "Alteração preparada para salvar.",
-                "success"
-            );
-
+            showToast("Alteração salva com sucesso!", "success");
         }
-    );
+        catch (error) {
+
+            // A confirmação de senha vale por 5 minutos
+            if (error.data.codigo === "REAUTENTICACAO_NECESSARIA") {
+
+                closeModal("editProfileModal");
+
+                document.getElementById("reauthEmail").value = currentUser.email;
+
+                document.getElementById("reauthModal").classList.remove("hidden");
+
+                showToast(error.message, "error");
+
+                return;
+            }
+
+            showApiError(error, {
+                valor: ["newProfileValue", "newProfileValueError"]
+            });
+        }
+        finally {
+            setLoading(button, false);
+        }
+    });
 
 
 /* =========================================================
@@ -2450,34 +1921,20 @@ document
 ========================================================= */
 
 document
-    .getElementById(
-        "saveProfileChanges"
-    )
-    .addEventListener(
-        "click",
-        () => {
+    .getElementById("saveProfileChanges")
+    .addEventListener("click", () => {
 
-            /*
-                As alterações individuais já são
-                aplicadas após a confirmação.
+        /*
+            Cada alteração já é salva no banco ao ser confirmada.
+            Este botão funciona como confirmação final visual.
+        */
 
-                Este botão funciona como confirmação
-                final visual da edição.
-            */
+        hasUnsavedChanges = false;
 
-            hasUnsavedChanges = false;
+        closeModal("profileModal");
 
-            closeModal(
-                "profileModal"
-            );
-
-            showToast(
-                "Alterações salvas com sucesso!",
-                "success"
-            );
-
-        }
-    );
+        showToast("Alterações salvas com sucesso!", "success");
+    });
 
 
 /* =========================================================
@@ -2485,34 +1942,16 @@ document
 ========================================================= */
 
 document
-    .getElementById(
-        "profileCloseButton"
-    )
-    .addEventListener(
-        "click",
-        () => {
+    .getElementById("profileCloseButton")
+    .addEventListener("click", () => {
 
-            if (hasUnsavedChanges) {
-
-                document
-                    .getElementById(
-                        "unsavedModal"
-                    )
-                    .classList.remove(
-                        "hidden"
-                    );
-
-                return;
-
-            }
-
-
-            closeModal(
-                "profileModal"
-            );
-
+        if (hasUnsavedChanges) {
+            document.getElementById("unsavedModal").classList.remove("hidden");
+            return;
         }
-    );
+
+        closeModal("profileModal");
+    });
 
 
 /* =========================================================
@@ -2520,19 +1959,10 @@ document
 ========================================================= */
 
 document
-    .getElementById(
-        "stayEditing"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            closeModal(
-                "unsavedModal"
-            );
-
-        }
-    );
+    .getElementById("stayEditing")
+    .addEventListener("click", () => {
+        closeModal("unsavedModal");
+    });
 
 
 /* =========================================================
@@ -2540,25 +1970,240 @@ document
 ========================================================= */
 
 document
-    .getElementById(
-        "discardChanges"
-    )
-    .addEventListener(
-        "click",
-        () => {
+    .getElementById("discardChanges")
+    .addEventListener("click", () => {
 
-            hasUnsavedChanges = false;
+        hasUnsavedChanges = false;
 
-            closeModal(
-                "unsavedModal"
-            );
+        closeModal("unsavedModal");
 
-            closeModal(
-                "profileModal"
-            );
+        closeModal("editProfileModal");
 
-        }
+        closeModal("profileModal");
+    });
+
+
+/* =========================================================
+   ASSISTENTE IA (RF04, RF05, RF06)
+========================================================= */
+
+function openAssistant() {
+
+    document.getElementById("assistantModal").classList.remove("hidden");
+
+    if (!chatMessages.children.length) {
+        addWelcomeMessage();
+    }
+
+    setTimeout(() => chatInput.focus(), 100);
+}
+
+
+function addWelcomeMessage() {
+
+    const name = currentUser ? `, ${escapeHtml(firstName(currentUser.nome))}` : "";
+
+    addChatMessage(
+        "bot",
+        `Olá${name}! Sou o assistente do EventoFácil. ` +
+        "Posso te ajudar com datas, locais e vagas dos eventos e " +
+        "recomendar eventos de acordo com os seus interesses."
     );
+}
+
+
+function addChatMessage(role, html) {
+
+    const message = document.createElement("div");
+
+    message.className = `chat-message ${role}`;
+
+    message.innerHTML = html;
+
+    chatMessages.appendChild(message);
+
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    return message;
+}
+
+
+/*
+    Formata o texto da IA com segurança:
+    escapa o HTML e só depois aplica negrito e quebras de linha.
+*/
+function formatAiText(text) {
+
+    return escapeHtml(text)
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        .replace(/^#{1,6}\s*(.+)$/gm, "<strong>$1</strong>")
+        .replace(/^\s*[-*]\s+/gm, "• ")
+        .replace(/\n/g, "<br>");
+}
+
+
+function appendEventChips(message, eventIds) {
+
+    const cited = (eventIds || [])
+        .map(id => events.find(event => event.id === id))
+        .filter(Boolean);
+
+    if (!cited.length) {
+        return;
+    }
+
+    const chips = document.createElement("div");
+
+    chips.className = "chat-event-chips";
+
+    cited.forEach(event => {
+
+        const chip = document.createElement("button");
+
+        chip.type = "button";
+
+        chip.className = "chat-event-chip";
+
+        chip.textContent = event.registered
+            ? `✓ ${event.title}`
+            : canRegister(event)
+                ? `Ver e inscrever-se: ${event.title}`
+                : `Ver: ${event.title}`;
+
+        chip.addEventListener("click", () => openEventModal(event));
+
+        chips.appendChild(chip);
+    });
+
+    message.appendChild(chips);
+
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+
+async function sendChatMessage(text) {
+
+    text = (text || "").trim();
+
+    if (!text || chatBusy) {
+        return;
+    }
+
+    chatBusy = true;
+
+    setLoading(chatSend, true);
+
+    chatInput.value = "";
+
+    chatSuggestions.classList.add("hidden");
+
+    addChatMessage("user", escapeHtml(text));
+
+    const answer = addChatMessage(
+        "bot",
+        '<span class="chat-typing" aria-label="Digitando"><span></span><span></span><span></span></span>'
+    );
+
+    try {
+
+        const data = await api("/assistente/perguntar", {
+            method: "POST",
+            body: {
+                mensagem: text,
+                conversation_id: chatConversationId
+            }
+        });
+
+        chatConversationId = data.conversation_id;
+
+        answer.innerHTML =
+            formatAiText(data.resposta) +
+            `<span class="chat-meta">Respondido em ${data.tempo_segundos.toFixed(1).replace(".", ",")} s</span>`;
+
+        appendEventChips(answer, data.eventos_citados);
+    }
+    catch (error) {
+
+        answer.classList.add("error");
+
+        answer.textContent = error.message;
+    }
+    finally {
+
+        chatBusy = false;
+
+        setLoading(chatSend, false);
+
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        chatInput.focus();
+    }
+}
+
+
+function resetChat() {
+
+    chatConversationId = null;
+
+    chatMessages.innerHTML = "";
+
+    chatSuggestions.classList.remove("hidden");
+
+    if (!document.getElementById("assistantModal").classList.contains("hidden")) {
+        addWelcomeMessage();
+    }
+}
+
+
+async function checkAssistantStatus() {
+
+    const status = document.getElementById("assistantStatus");
+
+    try {
+
+        const data = await api("/assistente/status");
+
+        status.classList.toggle("offline", !data.configurado);
+
+        status.lastChild.textContent = data.configurado
+            ? " Conectado ao Azure AI Foundry"
+            : " Assistente não configurado no servidor (.env)";
+    }
+    catch (error) {
+
+        status.classList.add("offline");
+
+        status.lastChild.textContent = " Servidor indisponível";
+    }
+}
+
+
+document
+    .getElementById("openAssistant")
+    .addEventListener("click", openAssistant);
+
+
+chatForm.addEventListener("submit", event => {
+
+    event.preventDefault();
+
+    sendChatMessage(chatInput.value);
+});
+
+
+chatSuggestions.addEventListener("click", event => {
+
+    const button = event.target.closest("[data-suggestion]");
+
+    if (button) {
+        sendChatMessage(button.dataset.suggestion);
+    }
+});
+
+
+document
+    .getElementById("chatReset")
+    .addEventListener("click", resetChat);
 
 
 /* =========================================================
@@ -2567,179 +2212,97 @@ document
 
 function closeModal(id) {
 
-    const modal =
-        document.getElementById(id);
+    const modal = document.getElementById(id);
 
     if (modal) {
-
-        modal.classList.add(
-            "hidden"
-        );
-
+        modal.classList.add("hidden");
     }
-
 }
 
 
 document
-    .querySelectorAll(
-        "[data-close-modal]"
-    )
+    .querySelectorAll("[data-close-modal]")
     .forEach(button => {
-
-        button.addEventListener(
-            "click",
-            () => {
-
-                closeModal(
-                    "eventModal"
-                );
-
-            }
-        );
-
+        button.addEventListener("click", () => closeModal("eventModal"));
     });
 
 
 document
-    .querySelectorAll(
-        "[data-close-reauth]"
-    )
+    .querySelectorAll("[data-close-reauth]")
     .forEach(button => {
-
-        button.addEventListener(
-            "click",
-            () => {
-
-                closeModal(
-                    "reauthModal"
-                );
-
-            }
-        );
-
+        button.addEventListener("click", () => closeModal("reauthModal"));
     });
 
 
 document
-    .getElementById(
-        "editProfileClose"
-    )
-    .addEventListener(
-        "click",
-        () => {
+    .getElementById("editProfileClose")
+    .addEventListener("click", () => {
 
-            if (hasUnsavedChanges) {
-
-                document
-                    .getElementById(
-                        "unsavedModal"
-                    )
-                    .classList.remove(
-                        "hidden"
-                    );
-
-                return;
-
-            }
-
-            closeModal(
-                "editProfileModal"
-            );
-
+        if (hasUnsavedChanges) {
+            document.getElementById("unsavedModal").classList.remove("hidden");
+            return;
         }
-    );
+
+        closeModal("editProfileModal");
+    });
 
 
 document
-    .querySelector(
-        "[data-close-assistant]"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            closeModal(
-                "assistantModal"
-            );
-
-        }
-    );
+    .querySelector("[data-close-assistant]")
+    .addEventListener("click", () => closeModal("assistantModal"));
 
 
 /* =========================================================
-   CLICAR FORA DO MODAL
+   CLICAR FORA DO MODAL / TECLA ESC
 ========================================================= */
 
 document
-    .querySelectorAll(
-        ".modal-overlay"
-    )
+    .querySelectorAll(".modal-overlay")
     .forEach(overlay => {
 
-        overlay.addEventListener(
-            "click",
-            event => {
+        overlay.addEventListener("click", event => {
 
-                if (
-                    event.target !==
-                    overlay
-                ) {
-                    return;
-                }
-
-
-                if (
-                    overlay.id ===
-                    "profileModal" &&
-                    hasUnsavedChanges
-                ) {
-
-                    document
-                        .getElementById(
-                            "unsavedModal"
-                        )
-                        .classList.remove(
-                            "hidden"
-                        );
-
-                    return;
-
-                }
-
-
-                overlay.classList.add(
-                    "hidden"
-                );
-
+            if (event.target !== overlay) {
+                return;
             }
-        );
 
+            if (
+                (overlay.id === "profileModal" || overlay.id === "editProfileModal") &&
+                hasUnsavedChanges
+            ) {
+                document.getElementById("unsavedModal").classList.remove("hidden");
+                return;
+            }
+
+            if (overlay.id === "confirmModal") {
+                confirmCallback = null;
+            }
+
+            overlay.classList.add("hidden");
+        });
     });
 
 
-/* =========================================================
-   IA
-========================================================= */
+document.addEventListener("keydown", event => {
 
-document
-    .getElementById(
-        "openAssistant"
-    )
-    .addEventListener(
-        "click",
-        () => {
+    if (event.key !== "Escape") {
+        return;
+    }
 
-            document
-                .getElementById(
-                    "assistantModal"
-                )
-                .classList.remove(
-                    "hidden"
-                );
+    // Fecha o modal que está por cima
+    const order = ["confirmModal", "eventModal", "reauthModal", "assistantModal"];
 
+    const open = order.find(id => !document.getElementById(id).classList.contains("hidden"));
+
+    if (open) {
+
+        if (open === "confirmModal") {
+            confirmCallback = null;
         }
-    );
+
+        closeModal(open);
+    }
+});
 
 
 /* =========================================================
@@ -2747,50 +2310,25 @@ document
 ========================================================= */
 
 document
-    .querySelectorAll(
-        ".nav-link"
-    )
+    .querySelectorAll(".nav-link")
     .forEach(link => {
 
-        link.addEventListener(
-            "click",
-            event => {
+        link.addEventListener("click", event => {
 
-                event.preventDefault();
+            event.preventDefault();
 
+            document
+                .getElementById(link.dataset.section)
+                ?.scrollIntoView({ behavior: "smooth" });
 
-                const sectionId =
-                    link.dataset.section;
+            document
+                .querySelectorAll(".nav-link")
+                .forEach(item => item.classList.remove("active"));
 
+            link.classList.add("active");
 
-                document
-                    .getElementById(
-                        sectionId
-                    )
-                    ?.scrollIntoView({
-                        behavior: "smooth"
-                    });
-
-
-                document
-                    .querySelectorAll(
-                        ".nav-link"
-                    )
-                    .forEach(
-                        item =>
-                            item.classList.remove(
-                                "active"
-                            )
-                    );
-
-
-                link.classList.add(
-                    "active"
-                );
-
-            }
-        );
-
+            document.querySelector(".main-nav").classList.remove("open");
+        });
     });
 
 
@@ -2799,23 +2337,10 @@ document
 ========================================================= */
 
 document
-    .querySelector(
-        "[data-scroll-events]"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            document
-                .getElementById(
-                    "events"
-                )
-                .scrollIntoView({
-                    behavior: "smooth"
-                });
-
-        }
-    );
+    .querySelector("[data-scroll-events]")
+    .addEventListener("click", () => {
+        document.getElementById("events").scrollIntoView({ behavior: "smooth" });
+    });
 
 
 /* =========================================================
@@ -2823,23 +2348,10 @@ document
 ========================================================= */
 
 document
-    .querySelector(
-        "[data-section-link='registrations']"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            document
-                .getElementById(
-                    "registrations"
-                )
-                .scrollIntoView({
-                    behavior: "smooth"
-                });
-
-        }
-    );
+    .querySelector("[data-section-link='registrations']")
+    .addEventListener("click", () => {
+        document.getElementById("registrations").scrollIntoView({ behavior: "smooth" });
+    });
 
 
 /* =========================================================
@@ -2847,23 +2359,10 @@ document
 ========================================================= */
 
 document
-    .getElementById(
-        "mobileMenuButton"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            document
-                .querySelector(
-                    ".main-nav"
-                )
-                .classList.toggle(
-                    "open"
-                );
-
-        }
-    );
+    .getElementById("mobileMenuButton")
+    .addEventListener("click", () => {
+        document.querySelector(".main-nav").classList.toggle("open");
+    });
 
 
 /* =========================================================
@@ -2871,46 +2370,15 @@ document
 ========================================================= */
 
 document
-    .querySelectorAll(
-        "[data-toggle-password]"
-    )
+    .querySelectorAll("[data-toggle-password]")
     .forEach(button => {
 
-        button.addEventListener(
-            "click",
-            () => {
+        button.addEventListener("click", () => {
 
-                const input =
-                    document.getElementById(
-                        button.dataset.togglePassword
-                    );
+            const input = document.getElementById(button.dataset.togglePassword);
 
-
-                if (
-                    input.type ===
-                    "password"
-                ) {
-
-                    input.type =
-                        "text";
-
-                    button.textContent =
-                        "◉";
-
-                }
-                else {
-
-                    input.type =
-                        "password";
-
-                    button.textContent =
-                        "◉";
-
-                }
-
-            }
-        );
-
+            input.type = input.type === "password" ? "text" : "password";
+        });
     });
 
 
@@ -2920,55 +2388,42 @@ document
 
 document
     .getElementById("goLogin")
-    .addEventListener(
-        "click",
-        () => {
-
-            clearForms();
-
-            showAuthView(
-                "loginView"
-            );
-
-        }
-    );
+    .addEventListener("click", () => {
+        clearForms();
+        showAuthView("loginView");
+    });
 
 
 document
     .getElementById("goRegister")
-    .addEventListener(
-        "click",
-        () => {
-
-            clearForms();
-
-            showAuthView(
-                "registerView"
-            );
-
-        }
-    );
+    .addEventListener("click", () => {
+        clearForms();
+        showAuthView("registerView");
+    });
 
 
 document
-    .querySelectorAll(
-        "[data-back-auth]"
-    )
+    .querySelectorAll("[data-back-auth]")
     .forEach(button => {
 
-        button.addEventListener(
-            "click",
-            () => {
+        button.addEventListener("click", () => {
+            clearForms();
+            showAuthView("authChoice");
+        });
+    });
 
-                clearForms();
 
-                showAuthView(
-                    "authChoice"
-                );
+document
+    .getElementById("backFromConfirm")
+    .addEventListener("click", () => {
 
-            }
-        );
+        stopCodeTimer("confirm");
 
+        clearForms();
+
+        document.getElementById("loginEmail").value = pendingConfirmEmail || "";
+
+        showAuthView("loginView");
     });
 
 
@@ -2978,54 +2433,27 @@ document
 
 document
     .getElementById("goForgot")
-    .addEventListener(
-        "click",
-        () => {
-
-            clearForms();
-
-            showAuthView(
-                "forgotEmailView"
-            );
-
-        }
-    );
+    .addEventListener("click", () => {
+        clearForms();
+        showAuthView("forgotEmailView");
+    });
 
 
 document
-    .querySelector(
-        "[data-back-login]"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            clearForms();
-
-            showAuthView(
-                "loginView"
-            );
-
-        }
-    );
+    .querySelector("[data-back-login]")
+    .addEventListener("click", () => {
+        clearForms();
+        showAuthView("loginView");
+    });
 
 
 document
-    .getElementById(
-        "backForgotEmail"
-    )
-    .addEventListener(
-        "click",
-        () => {
-
-            clearForms();
-
-            showAuthView(
-                "forgotEmailView"
-            );
-
-        }
-    );
+    .getElementById("backForgotEmail")
+    .addEventListener("click", () => {
+        stopCodeTimer("forgot");
+        clearForms();
+        showAuthView("forgotEmailView");
+    });
 
 
 /* =========================================================
@@ -3033,66 +2461,36 @@ document
 ========================================================= */
 
 document
-    .getElementById(
-        "logoutButton"
-    )
-    .addEventListener(
-        "click",
-        logout
-    );
+    .getElementById("logoutButton")
+    .addEventListener("click", logout);
 
 
 /* =========================================================
    RESTAURAR SESSÃO
+   (o cookie de sessão é enviado automaticamente)
 ========================================================= */
 
-function restoreSession() {
+async function restoreSession() {
 
-    const email =
-        localStorage.getItem(
-            STORAGE_SESSION
-        );
+    try {
 
+        const data = await api("/auth/me");
 
-    if (!email) {
+        if (!data.aluno) {
+            showAuthView("authChoice");
+            return;
+        }
 
-        showAuthView(
-            "authChoice"
-        );
-
-        return;
-
+        await openMainScreen(data.aluno);
     }
+    catch (error) {
 
+        showAuthView("authChoice");
 
-    const users =
-        getUsers();
-
-
-    const user =
-        users.find(
-            item =>
-                item.email === email
-        );
-
-
-    if (!user) {
-
-        localStorage.removeItem(
-            STORAGE_SESSION
-        );
-
-        showAuthView(
-            "authChoice"
-        );
-
-        return;
-
+        if (error.status === 0) {
+            showToast(error.message, "error");
+        }
     }
-
-
-    openMainScreen(user);
-
 }
 
 
@@ -3101,5 +2499,3 @@ function restoreSession() {
 ========================================================= */
 
 restoreSession();
-
-renderEvents();
