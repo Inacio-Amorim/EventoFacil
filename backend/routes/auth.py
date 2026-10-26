@@ -85,16 +85,16 @@ def cadastro():
 
     aluno = {"id_aluno": id_aluno, "nome": nome, "email": email}
     try:
-        validade = codigos.gerar_e_enviar(aluno, codigos.CONFIRMACAO)
+        envio = codigos.gerar_e_enviar(aluno, codigos.CONFIRMACAO)
     except ErroRegra as e:
         if e.status_http != 429:
             raise
-        validade = current_app.config["CODIGO_VALIDADE_MINUTOS"] * 60
+        envio = {"expira_em_segundos": current_app.config["CODIGO_VALIDADE_MINUTOS"] * 60}
 
     return jsonify({
         "mensagem": "Conta criada! Enviamos um código de confirmação para o seu e-mail.",
         "email": email,
-        "expira_em_segundos": validade,
+        **envio,
     }), 201
 
 
@@ -129,8 +129,8 @@ def reenviar_codigo():
         return erro("Conta não encontrada.", 404)
     if aluno["email_confirmado"]:
         return erro("Este e-mail já foi confirmado. Faça login.", 409)
-    validade = codigos.gerar_e_enviar(aluno, codigos.CONFIRMACAO)
-    return jsonify({"mensagem": "Novo código enviado.", "expira_em_segundos": validade})
+    envio = codigos.gerar_e_enviar(aluno, codigos.CONFIRMACAO)
+    return jsonify({"mensagem": "Novo código enviado.", **envio})
 
 
 # ------------------------------------------------------------------
@@ -151,9 +151,9 @@ def login():
         raise v.ErroCampo("senha", "Senha incorreta.")
 
     if not aluno["email_confirmado"]:
-        validade = current_app.config["CODIGO_VALIDADE_MINUTOS"] * 60
+        envio = {"expira_em_segundos": current_app.config["CODIGO_VALIDADE_MINUTOS"] * 60}
         try:
-            validade = codigos.gerar_e_enviar(aluno, codigos.CONFIRMACAO)
+            envio = codigos.gerar_e_enviar(aluno, codigos.CONFIRMACAO)
         except ErroRegra:
             pass
         return erro(
@@ -161,7 +161,7 @@ def login():
             403,
             codigo="EMAIL_NAO_CONFIRMADO",
             email=email,
-            expira_em_segundos=validade,
+            **envio,
         )
 
     _iniciar_sessao(aluno)
@@ -192,8 +192,8 @@ def recuperar_senha():
     aluno = _buscar_por_email(email)
     if not aluno:
         raise v.ErroCampo("email", "E-mail não encontrado.")
-    validade = codigos.gerar_e_enviar(aluno, codigos.RECUPERACAO)
-    return jsonify({"mensagem": "Código de recuperação enviado.", "expira_em_segundos": validade})
+    envio = codigos.gerar_e_enviar(aluno, codigos.RECUPERACAO)
+    return jsonify({"mensagem": "Código de recuperação enviado.", **envio})
 
 
 @bp.post("/auth/recuperar-senha/verificar")

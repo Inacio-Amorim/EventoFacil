@@ -24,7 +24,8 @@ INTERVALO_REENVIO_SEGUNDOS = 30
 
 
 def gerar_e_enviar(aluno, tipo):
-    """Gera um novo código, invalida os anteriores e envia por e-mail."""
+    """Gera um novo código, invalida os anteriores e envia por e-mail.
+    Devolve {"expira_em_segundos": ...} (+ "codigo_demo" no modo demonstração)."""
     cfg = current_app.config
     db = get_db()
 
@@ -65,7 +66,11 @@ def gerar_e_enviar(aluno, tipo):
             "de SMTP ou tente novamente.",
         )
 
-    return cfg["CODIGO_VALIDADE_MINUTOS"] * 60
+    envio = {"expira_em_segundos": cfg["CODIGO_VALIDADE_MINUTOS"] * 60}
+    # Modo demonstração (hospedagem sem e-mail): devolve o código para a tela
+    if cfg["DEMO_MOSTRAR_CODIGO"] and not cfg["SMTP_HOST"]:
+        envio["codigo_demo"] = codigo
+    return envio
 
 
 def validar(id_aluno, tipo, codigo, consumir=True):

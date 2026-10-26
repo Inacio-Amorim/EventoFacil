@@ -11,7 +11,6 @@ Variáveis de ambiente (ou backend/.env):
 """
 
 import os
-import re
 import sys
 from pathlib import Path
 
@@ -24,20 +23,10 @@ sys.path.insert(0, str(BACKEND_DIR))
 from app import create_app  # noqa: E402
 from config import Config  # noqa: E402
 from services import email_service  # noqa: E402
+from sql_script import comandos  # noqa: E402
 
-SQL_PATH = BACKEND_DIR.parent / "database" / "eventofacil.sql"
 TEST_DB = os.getenv("TEST_DB_NAME", "eventofacil_test")
-
-
-def _comandos_sql(nome_banco):
-    script = SQL_PATH.read_text(encoding="utf-8")
-    script = re.sub(r"\b(DATABASE IF EXISTS|DATABASE|USE)\s+eventofacil\b",
-                    rf"\1 {nome_banco}", script)
-    linhas = [l for l in script.splitlines() if not l.strip().startswith("--")]
-    return [c.strip() for c in re.split(r";\s*\n", "\n".join(linhas)) if c.strip()]
-
-
-COMANDOS = _comandos_sql(TEST_DB)
+COMANDOS = comandos(nome_banco=TEST_DB)
 
 
 def recriar_banco():

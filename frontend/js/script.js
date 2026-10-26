@@ -516,7 +516,7 @@ document
                 error.status === 403 &&
                 error.data.codigo === "EMAIL_NAO_CONFIRMADO"
             ) {
-                openConfirmEmailView(email, error.data.expira_em_segundos);
+                openConfirmEmailView(email, error.data.expira_em_segundos, error.data.codigo_demo);
                 showToast("Confirme seu e-mail para entrar. Enviamos um novo código.", "error");
                 return;
             }
@@ -625,7 +625,7 @@ document
                 body: { nome: name, email, ra, senha: password }
             });
 
-            openConfirmEmailView(data.email, data.expira_em_segundos);
+            openConfirmEmailView(data.email, data.expira_em_segundos, data.codigo_demo);
 
             showToast("Conta criada! Enviamos um código para o seu e-mail.", "success");
         }
@@ -771,11 +771,32 @@ function stopCodeTimer(key) {
 }
 
 
+/*
+    Modo demonstração: no site publicado sem servidor de e-mail,
+    o backend devolve o código para ser exibido na tela.
+*/
+function showDemoCode(elementId, code) {
+
+    const element = document.getElementById(elementId);
+
+    if (!code) {
+        element.classList.add("hidden");
+        element.textContent = "";
+        return;
+    }
+
+    element.innerHTML =
+        `Modo demonstração (sem servidor de e-mail).<br>Seu código é <strong>${escapeHtml(code)}</strong>`;
+
+    element.classList.remove("hidden");
+}
+
+
 /* =========================================================
    CONFIRMAÇÃO DE E-MAIL (CADASTRO)
 ========================================================= */
 
-function openConfirmEmailView(email, seconds) {
+function openConfirmEmailView(email, seconds, demoCode) {
 
     pendingConfirmEmail = email;
 
@@ -788,6 +809,8 @@ function openConfirmEmailView(email, seconds) {
     showAuthView("confirmEmailView");
 
     startCodeTimer("confirm", "confirmCodeTimer", seconds);
+
+    showDemoCode("confirmDemoCode", demoCode);
 
     focusCode("confirm");
 }
@@ -857,6 +880,8 @@ document
 
             startCodeTimer("confirm", "confirmCodeTimer", data.expira_em_segundos);
 
+            showDemoCode("confirmDemoCode", data.codigo_demo);
+
             focusCode("confirm");
 
             showToast("Novo código enviado para o seu e-mail.", "success");
@@ -915,6 +940,8 @@ document
             document.getElementById("forgotCodeError").textContent = "";
 
             startCodeTimer("forgot", "codeTimer", data.expira_em_segundos);
+
+            showDemoCode("forgotDemoCode", data.codigo_demo);
 
             showAuthView("forgotCodeView");
 

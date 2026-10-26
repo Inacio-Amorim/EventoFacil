@@ -6,12 +6,38 @@ fechada ao final da requisição. Todas as consultas usam parâmetros
 (%s) para evitar SQL Injection.
 """
 
+import ssl
 from datetime import date, datetime
 from decimal import Decimal
+from pathlib import Path
 
 import pymysql
 import pymysql.cursors
 from flask import current_app, g
+
+BASE_DIR = Path(__file__).resolve().parent
+
+
+def _fuso_local():
+    """Fuso do servidor no formato do MySQL (ex.: -03:00), para que NOW() do
+    banco e datetime.now() do Python usem o mesmo relógio."""
+    deslocamento = datetime.now().astimezone().strftime("%z")
+    return f"{deslocamento[:3]}:{deslocamento[3:]}"
+
+
+def _contexto_ssl(cfg):
+    if not cfg.get("DB_SSL"):
+        return None
+    contexto = ssl.create_default_context()
+    # O Python 3.13 ficou mais rígido com certificados de autoridades privadas
+    # (como as dos bancos na nuvem); o PyMySQL faz o mesmo ajuste.
+    contexto.verify_flags &= ~ssl.VERIFY_X509_STRICT
+    if cfg.get("DB_SSL_CA"):
+        caminho = Path(cfg["DB_SSL_CA"])
+        if not caminho.is_absolute():
+            caminho = BASE_DIR / caminho
+        contexto.load_verify_locations(cafile=str(caminho))
+    return contexto
 
 
 def conectar(config=None, database=True):
@@ -25,6 +51,8 @@ def conectar(config=None, database=True):
         charset="utf8mb4",
         cursorclass=pymysql.cursors.DictCursor,
         autocommit=False,
+        ssl=_contexto_ssl(cfg),
+        init_command=f"SET time_zone = '{_fuso_local()}'",
     )
 
 

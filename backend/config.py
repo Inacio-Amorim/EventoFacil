@@ -8,6 +8,7 @@ nunca do código-fonte (ADR03 / RNF05).
 import os
 import secrets
 from pathlib import Path
+from urllib.parse import parse_qs, unquote, urlparse
 
 from dotenv import load_dotenv
 
@@ -24,6 +25,33 @@ def _bool(valor, padrao=False):
     return str(valor).strip().lower() in ("1", "true", "sim", "yes", "on")
 
 
+def _banco_da_url():
+    """
+    Na hospedagem, o banco vem numa única variável DATABASE_URL, no formato
+    mysql://usuario:senha@host:porta/banco?ssl-mode=REQUIRED (padrão do Aiven).
+    """
+    url = os.getenv("DATABASE_URL", "").strip()
+    if not url:
+        return {}
+    partes = urlparse(url)
+    modo_ssl = parse_qs(partes.query).get("ssl-mode", [""])[0].upper()
+    return {
+        "DB_HOST": partes.hostname,
+        "DB_PORT": str(partes.port or 3306),
+        "DB_USER": unquote(partes.username or ""),
+        "DB_PASSWORD": unquote(partes.password or ""),
+        "DB_NAME": partes.path.lstrip("/") or "eventofacil",
+        "DB_SSL": "true" if modo_ssl in ("REQUIRED", "VERIFY_CA", "VERIFY_IDENTITY") else "",
+    }
+
+
+_URL = _banco_da_url()
+
+
+def _db(nome, padrao=""):
+    return _URL.get(nome) or os.getenv(nome, padrao)
+
+
 class Config:
     # Chave usada para assinar o cookie de sessão do Flask.
     # Se não for definida, é gerada uma aleatória a cada execução
@@ -36,11 +64,24 @@ class Config:
     SESSION_COOKIE_SECURE = _bool(os.getenv("SESSION_COOKIE_SECURE"))
 
     # ---------------- Banco de dados (MySQL) ----------------
-    DB_HOST = os.getenv("DB_HOST", "localhost")
-    DB_PORT = int(os.getenv("DB_PORT", "3306"))
-    DB_USER = os.getenv("DB_USER", "root")
-    DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-    DB_NAME = os.getenv("DB_NAME", "eventofacil")
+    # Local: DB_HOST, DB_USER... no .env. Hospedagem: DATABASE_URL.
+    DB_HOST = _db("DB_HOST", "localhost")
+    DB_PORT = int(_db("DB_PORT", "3306"))
+    DB_USER = _db("DB_USER", "root")
+    DB_PASSWORD = _db("DB_PASSWORD", "")
+    DB_NAME = _db("DB_NAME", "eventofacil")
+    # Conexão criptografada (bancos na nuvem exigem). DB_SSL_CA aponta para o
+    # certificado da autoridade do provedor, para conferir o servidor.
+    DB_SSL = _bool(_db("DB_SSL"))
+    DB_SSL_CA = os.getenv("DB_SSL_CA", "")
+
+    # Hospedagem gratuita sem servidor de e-mail: mostra o código de
+    # confirmação na própria tela (somente para demonstração do trabalho).
+    DEMO_MOSTRAR_CODIGO = _bool(os.getenv("DEMO_MOSTRAR_CODIGO"))
+
+    # Atrás do proxy da hospedagem (Render): usa o IP real do visitante
+    # (limite de perguntas ao assistente) e reconhece o HTTPS.
+    ATRAS_DE_PROXY = _bool(os.getenv("ATRAS_DE_PROXY"))
 
     # ---------------- Coordenação (RN04) ----------------
     ADMIN_SENHA = os.getenv("ADMIN_SENHA", "")

@@ -36,6 +36,11 @@ def create_app(config_extra=None):
     if config_extra:
         app.config.update(config_extra)
 
+    if app.config.get("ATRAS_DE_PROXY"):
+        from werkzeug.middleware.proxy_fix import ProxyFix
+
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
     # Respostas JSON com acentos legíveis
     app.json.ensure_ascii = False
 
